@@ -81,67 +81,48 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 Item = _authorizeNetPaymentSettings.TransactionKey,
             };
         }
-        
+
         private static bool GetErrors(createTransactionResponse response, IList<string> errors)
         {
-            var rezult = false;
-            if (response != null && response.messages.resultCode == messageTypeEnum.Ok)
-            {
-                switch (response.transactionResponse.responseCode)
-                {
-                    case "1":
-                        break;
-                    case "2":
-                    {
-                        errors.Add(string.Format("Declined ({0}: {1})", response.transactionResponse.responseCode,
-                            response.transactionResponse.messages[0].description));
-                        rezult = true;
-                    }
-                        break;
-                    case "3":
-                    {
-                        foreach (var transactionResponseError in response.transactionResponse.errors)
-                        {
-                            errors.Add(string.Format("Error #{0}: {1}", transactionResponseError.errorCode,
-                                transactionResponseError.errorText));
-                        }
-                        rezult = true;
-                    }
-                        break;
-                    default:
-                    {
-                        errors.Add("Authorize.NET unknown error");
-                        rezult = true;
-                    }
-                        break;
-                }
-
-                return rezult;
-            }
-
             if (response != null)
             {
-                foreach (var responseMessage in response.messages.message)
-                {
-                    errors.Add(string.Format("Error #{0}: {1}", responseMessage.code, responseMessage.text));
-                }
-
-                if (response.transactionResponse != null)
+                if (response.transactionResponse != null && response.transactionResponse.errors != null)
                 {
                     foreach (var transactionResponseError in response.transactionResponse.errors)
                     {
-                        errors.Add(string.Format("Error #{0}: {1}", transactionResponseError.errorCode, transactionResponseError.errorText));
+                        errors.Add(string.Format("Error #{0}: {1}", transactionResponseError.errorCode,
+                            transactionResponseError.errorText));
+                    }
+
+                    return true;
+                }
+
+                if (response.transactionResponse != null && response.messages.resultCode == messageTypeEnum.Ok)
+                {
+                    switch (response.transactionResponse.responseCode)
+                    {
+                        case "1":
+                        {
+                            return false;
+                        }
+                        case "2":
+                        {
+                            var description = response.transactionResponse.messages.Any()
+                                ? response.transactionResponse.messages.First().description
+                                : String.Empty;
+                            errors.Add(
+                                string.Format("Declined ({0}: {1})", response.transactionResponse.responseCode,
+                                    description).TrimEnd(new[] {':', ' '}));
+                            return true;
+                        }
                     }
                 }
             }
-            else
-            {
-                errors.Add("Authorize.NET unknown error");
-            }
 
+            errors.Add("Authorize.NET unknown error");
             return true;
         }
-        
+
         #endregion
 
         #region Methods
