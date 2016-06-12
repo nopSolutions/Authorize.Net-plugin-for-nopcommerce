@@ -82,8 +82,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             };
         }
 
-        private static bool GetErrors(createTransactionResponse response, IList<string> errors)
+        private static bool GetErrors(createTransactionController controller, IList<string> errors)
         {
+            var response = controller.GetApiResponse();
+
             if (response != null)
             {
                 if (response.transactionResponse != null && response.transactionResponse.errors != null)
@@ -116,6 +118,17 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                             return true;
                         }
                     }
+                }
+            }
+            else
+            {
+                var error = controller.GetErrorResponse();
+                if (error != null && error.messages != null && error.messages.message != null && error.messages.message.Any())
+                {
+                    var message = error.messages.message.First();
+
+                    errors.Add(string.Format("Error #{0}: {1}", message.code, message.text));
+                    return true;
                 }
             }
 
@@ -209,7 +222,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             var response = controller.GetApiResponse();
 
             //validate
-            if (GetErrors(response, result.Errors))
+            if (GetErrors(controller, result.Errors))
                 return result;
 
             if (_authorizeNetPaymentSettings.TransactMode == TransactMode.Authorize)
@@ -288,7 +301,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             var response = controller.GetApiResponse();
 
             //validate
-            if (GetErrors(response, result.Errors))
+            if (GetErrors(controller, result.Errors))
                 return result;
 
             result.CaptureTransactionId = string.Format("{0},{1}", response.transactionResponse.transId, response.transactionResponse.authCode);
@@ -347,12 +360,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             // instantiate the contoller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
-
-            // get the response from the service (errors contained if any)
-            var response = controller.GetApiResponse();
-
+            
             //validate
-            if (GetErrors(response, result.Errors))
+            if (GetErrors(controller, result.Errors))
                 return result;
 
             var isOrderFullyRefunded = refundPaymentRequest.AmountToRefund + refundPaymentRequest.Order.RefundedAmount == refundPaymentRequest.Order.OrderTotal;
@@ -405,12 +415,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             // instantiate the contoller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
-
-            // get the response from the service (errors contained if any)
-            var response = controller.GetApiResponse();
-
+           
             //validate
-            if (GetErrors(response, result.Errors))
+            if (GetErrors(controller, result.Errors))
                 return result;
 
             result.NewPaymentStatus = PaymentStatus.Voided;
