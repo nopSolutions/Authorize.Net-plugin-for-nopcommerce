@@ -74,7 +74,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 : AuthorizeNetSDK.Environment.PRODUCTION;
 
             // define the merchant information (authentication / transaction id)
-            ApiOperationBase<ANetApiRequest, ANetApiResponse>.MerchantAuthentication = new merchantAuthenticationType()
+            ApiOperationBase<ANetApiRequest, ANetApiResponse>.MerchantAuthentication = new merchantAuthenticationType
             {
                 name = _authorizeNetPaymentSettings.LoginId,
                 ItemElementName = ItemChoiceType.transactionKey,
@@ -82,7 +82,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             };
         }
 
-        private static bool GetErrors(createTransactionController controller, IList<string> errors)
+        private static createTransactionResponse GetApiResponse(createTransactionController controller, IList<string> errors)
         {
             var response = controller.GetApiResponse();
 
@@ -96,7 +96,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                             transactionResponseError.errorText));
                     }
 
-                    return true;
+                    return null;
                 }
 
                 if (response.transactionResponse != null && response.messages.resultCode == messageTypeEnum.Ok)
@@ -105,7 +105,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     {
                         case "1":
                         {
-                            return false;
+                            return response;
                         }
                         case "2":
                         {
@@ -115,8 +115,18 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                             errors.Add(
                                 string.Format("Declined ({0}: {1})", response.transactionResponse.responseCode,
                                     description).TrimEnd(new[] {':', ' '}));
-                            return true;
+                            return null;
                         }
+                    }
+                }
+                else if (response.transactionResponse != null && response.messages.resultCode == messageTypeEnum.Error)
+                {
+                    if (response.messages != null && response.messages.message != null && response.messages.message.Any())
+                    {
+                        var message = response.messages.message.First();
+
+                        errors.Add(string.Format("Error #{0}: {1}", message.code, message.text));
+                        return null;
                     }
                 }
             }
@@ -128,12 +138,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     var message = error.messages.message.First();
 
                     errors.Add(string.Format("Error #{0}: {1}", message.code, message.text));
-                    return true;
+                    return null;
                 }
             }
 
             errors.Add("Authorize.NET unknown error");
-            return true;
+            return null;
         }
 
         #endregion
@@ -219,10 +229,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             controller.Execute();
 
             // get the response from the service (errors contained if any)
-            var response = controller.GetApiResponse();
+            var response = GetApiResponse(controller, result.Errors);
 
             //validate
-            if (GetErrors(controller, result.Errors))
+            if (response == null)
                 return result;
 
             if (_authorizeNetPaymentSettings.TransactMode == TransactMode.Authorize)
@@ -298,10 +308,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             controller.Execute();
 
             // get the response from the service (errors contained if any)
-            var response = controller.GetApiResponse();
+            var response = GetApiResponse(controller, result.Errors);
 
             //validate
-            if (GetErrors(controller, result.Errors))
+            if (response == null)
                 return result;
 
             result.CaptureTransactionId = string.Format("{0},{1}", response.transactionResponse.transId, response.transactionResponse.authCode);
@@ -360,9 +370,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             // instantiate the contoller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
-            
+
+            var response = GetApiResponse(controller, result.Errors);
+
             //validate
-            if (GetErrors(controller, result.Errors))
+            if (response == null)
                 return result;
 
             var isOrderFullyRefunded = refundPaymentRequest.AmountToRefund + refundPaymentRequest.Order.RefundedAmount == refundPaymentRequest.Order.OrderTotal;
@@ -415,9 +427,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             // instantiate the contoller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
-           
+
+            var response = GetApiResponse(controller, result.Errors);
+
             //validate
-            if (GetErrors(controller, result.Errors))
+            if (response == null)
                 return result;
 
             result.NewPaymentStatus = PaymentStatus.Voided;
