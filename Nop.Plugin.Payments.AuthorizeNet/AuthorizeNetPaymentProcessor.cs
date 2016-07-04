@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Configuration;
 using System.Web.Routing;
 using AuthorizeNet.Api.Contracts.V1;
 using AuthorizeNet.Api.Controllers;
@@ -16,6 +17,7 @@ using Nop.Services.Configuration;
 using Nop.Services.Customers;
 using Nop.Services.Directory;
 using Nop.Services.Localization;
+using Nop.Services.Logging;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Security;
@@ -36,7 +38,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         private readonly ICustomerService _customerService;
         private readonly IWebHelper _webHelper;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
+        private readonly IOrderService _orderService;
+        private readonly IOrderProcessingService _orderProcessingService;
         private readonly IEncryptionService _encryptionService;
+        private readonly ILogger _logger;
         private readonly CurrencySettings _currencySettings;
         private readonly AuthorizeNetPaymentSettings _authorizeNetPaymentSettings;
 
@@ -48,8 +53,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             ICurrencyService currencyService,
             ICustomerService customerService,
             IWebHelper webHelper,
-            IOrderTotalCalculationService orderTotalCalculationService, 
+            IOrderTotalCalculationService orderTotalCalculationService,
+            IOrderService orderService,
+            IOrderProcessingService orderProcessingService,
             IEncryptionService encryptionService,
+            ILogger logger,
             CurrencySettings currencySettings,
             AuthorizeNetPaymentSettings authorizeNetPaymentSettings)
         {
@@ -61,6 +69,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this._webHelper = webHelper;
             this._orderTotalCalculationService = orderTotalCalculationService;
             this._encryptionService = encryptionService;
+            this._logger = logger;
+            this._orderService = orderService;
+            this._orderProcessingService = orderProcessingService;
         }
 
         #endregion
@@ -114,7 +125,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                                 : String.Empty;
                             errors.Add(
                                 string.Format("Declined ({0}: {1})", response.transactionResponse.responseCode,
-                                    description).TrimEnd(new[] {':', ' '}));
+                                    description).TrimEnd(':', ' '));
                             return null;
                         }
                     }
@@ -141,11 +152,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     return null;
                 }
             }
-
-            errors.Add("Authorize.NET unknown error");
+            var controllerResult = controller.GetResults().FirstOrDefault();
+            const string unknownError = "Authorize.NET unknown error";
+            errors.Add(String.IsNullOrEmpty(controllerResult) ? unknownError : String.Format("{0} ({1})", unknownError, controllerResult));
             return null;
         }
-
+        
         #endregion
 
         #region Methods
@@ -589,7 +601,87 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             
             return result;
         }
-        
+
+        /// <summary>
+        /// Process recurring payment
+        /// </summary>
+        /// <param name="transactionId">AuthorizeNet transaction ID</param>
+        public void ProcessRecurringPayment(string transactionId)
+        {
+            PrepareAuthorizeNet();
+            var request = new getTransactionDetailsRequest { transId = transactionId };
+
+            // instantiate the controller that will call the service
+            var controller = new getTransactionDetailsController(request);
+            controller.Execute();
+
+            // get the response from the service (errors contained if any)
+            var response = controller.GetApiResponse();
+
+            if (response != null && response.messages.resultCode == messageTypeEnum.Ok)
+            {
+                var transaction = response.transaction;
+                if (transaction == null)
+                {
+                    _logger.Error(String.Format("Authorize.NET: Transaction data is missing (transactionId: {0})", transactionId));
+                    return;
+                }
+
+                if (transaction.transactionStatus != "settledSuccessfully")
+                {
+                    return;
+                }
+
+                var orderDescriptions = transaction.order.description.Split('#');
+
+                if (orderDescriptions.Length < 2)
+                {
+                    _logger.Error(String.Format("Authorize.NET: Missing order GUID (transactionId: {0})", transactionId));
+                    return;
+                }
+
+                var order = _orderService.GetOrderByGuid(new Guid(orderDescriptions[1]));
+
+                if (order == null)
+                {
+                    _logger.Error(String.Format("Authorize.NET: Order cannot be loaded (order GUID: {0})", orderDescriptions[1]));
+                    return;
+                }
+
+                var recurringPayments = _orderService.SearchRecurringPayments(initialOrderId: order.Id);
+                foreach (var rp in recurringPayments)
+                {
+                    var recurringPaymentHistory = rp.RecurringPaymentHistory;
+                    if (recurringPaymentHistory.Count == 0)
+                    {
+                        //first payment
+                        var rph = new RecurringPaymentHistory
+                        {
+                            RecurringPaymentId = rp.Id,
+                            OrderId = order.Id,
+                            CreatedOnUtc = DateTime.UtcNow
+                        };
+                        rp.RecurringPaymentHistory.Add(rph);
+                        _orderService.UpdateRecurringPayment(rp);
+                    }
+                    else
+                    {
+                        //next payments
+                        _orderProcessingService.ProcessNextRecurringPayment(rp);
+                    }
+                }
+
+            }
+            else if (response != null)
+            {
+                _logger.Error(String.Format("Authorize.Net Error: {0} - {1} (transactionId: {2})", response.messages.message[0].code, response.messages.message[0].text, transactionId));
+            }
+            else
+            {
+                _logger.Error(String.Format("Authorize.NET unknown error (transactionId: {0})", transactionId));
+            }
+        }
+
         /// <summary>
         /// Cancels a recurring payment
         /// </summary>
@@ -664,7 +756,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             controllerName = "PaymentAuthorizeNet";
             routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.AuthorizeNet.Controllers" }, { "area", null } };
         }
-
+        
         public Type GetControllerType()
         {
             return typeof(PaymentAuthorizeNetController);
@@ -778,7 +870,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         {
             get
             {
-                return RecurringPaymentType.Manual;
+                return RecurringPaymentType.Automatic;
             }
         }
 
