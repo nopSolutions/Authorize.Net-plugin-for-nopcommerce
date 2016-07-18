@@ -61,19 +61,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
 
             if (storeScope > 0)
             {
-                model.UseSandbox_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings,
-                    x => x.UseSandbox, storeScope);
-                model.TransactModeId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings,
-                    x => x.TransactMode, storeScope);
-                model.TransactionKey_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings,
-                    x => x.TransactionKey, storeScope);
-                model.LoginId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings,
-                    x => x.LoginId, storeScope);
-                model.AdditionalFee_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings,
-                    x => x.AdditionalFee, storeScope);
-                model.AdditionalFeePercentage_OverrideForStore =
-                    _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage,
-                        storeScope);
+                model.UseSandbox_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.UseSandbox, storeScope);
+                model.TransactModeId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.TransactMode, storeScope);
+                model.TransactionKey_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.TransactionKey, storeScope);
+                model.LoginId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.LoginId, storeScope);
+                model.AdditionalFee_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFee, storeScope);
+                model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
             }
 
             return View("~/Plugins/Payments.AuthorizeNet/Views/PaymentAuthorizeNet/Configure.cshtml", model);
@@ -173,16 +166,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             model.CardholderName = form["CardholderName"];
             model.CardNumber = form["CardNumber"];
             model.CardCode = form["CardCode"];
-            var selectedMonth =
-                model.ExpireMonths.FirstOrDefault(
-                    x => x.Value.Equals(form["ExpireMonth"], StringComparison.InvariantCultureIgnoreCase));
+            var selectedMonth = model.ExpireMonths.FirstOrDefault(x => x.Value.Equals(form["ExpireMonth"], StringComparison.InvariantCultureIgnoreCase));
 
             if (selectedMonth != null)
                 selectedMonth.Selected = true;
 
-            var selectedYear =
-                model.ExpireYears.FirstOrDefault(
-                    x => x.Value.Equals(form["ExpireYear"], StringComparison.InvariantCultureIgnoreCase));
+            var selectedYear = model.ExpireYears.FirstOrDefault(x => x.Value.Equals(form["ExpireYear"], StringComparison.InvariantCultureIgnoreCase));
 
             if (selectedYear != null)
                 selectedYear.Selected = true;
@@ -233,10 +222,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
         [ValidateInput(false)]
         public ActionResult IPNHandler(FormCollection form)
         {
-            var processor =
-                _paymentService.LoadPaymentMethodBySystemName("Payments.AuthorizeNet") as AuthorizeNetPaymentProcessor;
-            if (processor == null ||
-                !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
+            var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AuthorizeNet") as AuthorizeNetPaymentProcessor;
+            if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
                 throw new NopException("AuthorizeNet module cannot be loaded");
 
             var responseCode = form.AllKeys.Contains("x_response_code") ? form["x_response_code"] : String.Empty;
