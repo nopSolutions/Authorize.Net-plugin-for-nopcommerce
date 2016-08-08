@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Configuration;
 using System.Web.Routing;
 using AuthorizeNet.Api.Contracts.V1;
 using AuthorizeNet.Api.Controllers;
@@ -89,7 +88,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             {
                 name = _authorizeNetPaymentSettings.LoginId,
                 ItemElementName = ItemChoiceType.transactionKey,
-                Item = _authorizeNetPaymentSettings.TransactionKey,
+                Item = _authorizeNetPaymentSettings.TransactionKey
             };
         }
 
@@ -459,9 +458,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
-
-            if (processPaymentRequest.IsRecurringPayment) return result;
-
+           
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
 
             PrepareAuthorizeNet();

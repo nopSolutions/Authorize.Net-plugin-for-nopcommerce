@@ -6,11 +6,11 @@ using Nop.Core;
 using Nop.Core.Domain.Payments;
 using Nop.Plugin.Payments.AuthorizeNet.Models;
 using Nop.Plugin.Payments.AuthorizeNet.Validators;
+using Nop.Services;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Payments;
 using Nop.Services.Stores;
-using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
 
 namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
@@ -95,36 +95,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
-            if (model.UseSandbox_OverrideForStore || storeScope == 0)
-                _settingService.SaveSetting(authorizeNetPaymentSettings, x => x.UseSandbox, storeScope, false);
-            else if (storeScope > 0)
-                _settingService.DeleteSetting(authorizeNetPaymentSettings, x => x.UseSandbox, storeScope);
-
-            if (model.TransactModeId_OverrideForStore || storeScope == 0)
-                _settingService.SaveSetting(authorizeNetPaymentSettings, x => x.TransactMode, storeScope, false);
-            else if (storeScope > 0)
-                _settingService.DeleteSetting(authorizeNetPaymentSettings, x => x.TransactMode, storeScope);
-
-            if (model.TransactionKey_OverrideForStore || storeScope == 0)
-                _settingService.SaveSetting(authorizeNetPaymentSettings, x => x.TransactionKey, storeScope, false);
-            else if (storeScope > 0)
-                _settingService.DeleteSetting(authorizeNetPaymentSettings, x => x.TransactionKey, storeScope);
-
-            if (model.LoginId_OverrideForStore || storeScope == 0)
-                _settingService.SaveSetting(authorizeNetPaymentSettings, x => x.LoginId, storeScope, false);
-            else if (storeScope > 0)
-                _settingService.DeleteSetting(authorizeNetPaymentSettings, x => x.LoginId, storeScope);
-
-            if (model.AdditionalFee_OverrideForStore || storeScope == 0)
-                _settingService.SaveSetting(authorizeNetPaymentSettings, x => x.AdditionalFee, storeScope, false);
-            else if (storeScope > 0)
-                _settingService.DeleteSetting(authorizeNetPaymentSettings, x => x.AdditionalFee, storeScope);
-
-            if (model.AdditionalFeePercentage_OverrideForStore || storeScope == 0)
-                _settingService.SaveSetting(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, storeScope,
-                    false);
-            else if (storeScope > 0)
-                _settingService.DeleteSetting(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.UseSandbox, model.UseSandbox_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.TransactionKey, model.TransactionKey_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.LoginId, model.LoginId_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
 
             //now clear settings cache
             _settingService.ClearCache();
