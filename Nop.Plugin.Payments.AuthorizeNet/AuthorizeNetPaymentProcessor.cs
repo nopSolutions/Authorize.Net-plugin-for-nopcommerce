@@ -624,7 +624,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     return;
                 }
 
-                if (transaction.transactionStatus != "settledSuccessfully")
+                if (transaction.transactionStatus == "refundTransaction")
                 {
                     return;
                 }
@@ -644,11 +644,23 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     _logger.Error(String.Format("Authorize.NET: Order cannot be loaded (order GUID: {0})", orderDescriptions[1]));
                     return;
                 }
-
+                
                 var recurringPayments = _orderService.SearchRecurringPayments(initialOrderId: order.Id);
                 foreach (var rp in recurringPayments)
                 {
                     var recurringPaymentHistory = rp.RecurringPaymentHistory;
+                    var orders = _orderService.GetOrdersByIds(recurringPaymentHistory.Select(rph => rph.OrderId).ToArray()).ToList();
+                    
+                    var transactionsIds = new List<string>();
+                    transactionsIds.AddRange(orders.Select(o => o.AuthorizationTransactionId).Where(tId=>!string.IsNullOrEmpty(tId)));
+                    transactionsIds.AddRange(orders.Select(o => o.CaptureTransactionId).Where(tId => !string.IsNullOrEmpty(tId)));
+
+                    //skip the re-processing of transactions
+                    if (transactionsIds.Contains(transactionId))
+                        continue;
+
+                    var newPaymentStatus = transaction.transactionType == "authCaptureTransaction" || transaction.transactionType == "authOnlyTransaction" ? PaymentStatus.Authorized : PaymentStatus.Pending;
+
                     if (recurringPaymentHistory.Count == 0)
                     {
                         //first payment
@@ -659,12 +671,26 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                             CreatedOnUtc = DateTime.UtcNow
                         };
                         rp.RecurringPaymentHistory.Add(rph);
+
+                        if (newPaymentStatus == PaymentStatus.Authorized)
+                            rp.InitialOrder.AuthorizationTransactionId = transactionId;
+                        else
+                            rp.InitialOrder.CaptureTransactionId = transactionId;
+
                         _orderService.UpdateRecurringPayment(rp);
                     }
                     else
                     {
                         //next payments
-                        _orderProcessingService.ProcessNextRecurringPayment(rp);
+                        var processPaymentResult = new ProcessPaymentResult();
+                        processPaymentResult.NewPaymentStatus = newPaymentStatus;
+
+                        if (newPaymentStatus == PaymentStatus.Authorized)
+                            processPaymentResult.AuthorizationTransactionId = transactionId;
+                        else
+                            processPaymentResult.CaptureTransactionId = transactionId;
+
+                        _orderProcessingService.ProcessNextRecurringPayment(rp, processPaymentResult);
                     }
                 }
 
