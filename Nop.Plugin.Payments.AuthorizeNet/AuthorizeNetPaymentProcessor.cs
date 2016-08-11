@@ -247,7 +247,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 return result;
 
             if (_authorizeNetPaymentSettings.TransactMode == TransactMode.Authorize)
+            {
+                result.AuthorizationTransactionId = response.transactionResponse.transId;
                 result.AuthorizationTransactionCode = string.Format("{0},{1}", response.transactionResponse.transId, response.transactionResponse.authCode);
+            }
             if (_authorizeNetPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture)
                 result.CaptureTransactionId = string.Format("{0},{1}", response.transactionResponse.transId, response.transactionResponse.authCode);
 
@@ -659,7 +662,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     if (transactionsIds.Contains(transactionId))
                         continue;
 
-                    var newPaymentStatus = transaction.transactionType == "authCaptureTransaction" || transaction.transactionType == "authOnlyTransaction" ? PaymentStatus.Authorized : PaymentStatus.Pending;
+                    var newPaymentStatus =  transaction.transactionType == "authOnlyTransaction" ? PaymentStatus.Authorized : PaymentStatus.Paid;
 
                     if (recurringPaymentHistory.Count == 0)
                     {
