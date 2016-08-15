@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Web.Routing;
 using AuthorizeNet.Api.Contracts.V1;
 using AuthorizeNet.Api.Controllers;
@@ -90,6 +91,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 ItemElementName = ItemChoiceType.transactionKey,
                 Item = _authorizeNetPaymentSettings.TransactionKey
             };
+
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
         private static createTransactionResponse GetApiResponse(createTransactionController controller, IList<string> errors)
