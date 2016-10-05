@@ -422,8 +422,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             var lastFourDigitsCardNumber = maskedCreditCardNumberDecrypted.Substring(maskedCreditCardNumberDecrypted.Length - 4);
             var expirationDate = voidPaymentRequest.Order.CardExpirationMonth + voidPaymentRequest.Order.CardExpirationYear;
 
-            if (!expirationDate.Any() && _authorizeNetPaymentSettings.UseSandbox)
-                expirationDate = DateTime.Now.ToString("MMyyyy");
+            if (!expirationDate.Any())
+                expirationDate = "XXXX";
 
             var creditCard = new creditCardType
             {
