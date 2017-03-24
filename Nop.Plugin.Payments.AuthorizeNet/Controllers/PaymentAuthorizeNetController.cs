@@ -69,7 +69,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
                 model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
             }
 
-            return View("~/Plugins/Payments.AuthorizeNet/Views/PaymentAuthorizeNet/Configure.cshtml", model);
+            return View("~/Plugins/Payments.AuthorizeNet/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
@@ -152,7 +152,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             if (selectedYear != null)
                 selectedYear.Selected = true;
 
-            return View("~/Plugins/Payments.AuthorizeNet/Views/PaymentAuthorizeNet/PaymentInfo.cshtml", model);
+            return View("~/Plugins/Payments.AuthorizeNet/Views/PaymentInfo.cshtml", model);
         }
 
         [NonAction]

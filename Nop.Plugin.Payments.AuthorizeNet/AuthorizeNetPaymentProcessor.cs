@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Web.Routing;
 using AuthorizeNet.Api.Contracts.V1;
 using AuthorizeNet.Api.Controllers;
@@ -44,6 +43,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         private readonly ILogger _logger;
         private readonly CurrencySettings _currencySettings;
         private readonly AuthorizeNetPaymentSettings _authorizeNetPaymentSettings;
+        private readonly ILocalizationService _localizationService;
 
         #endregion
 
@@ -59,7 +59,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             IEncryptionService encryptionService,
             ILogger logger,
             CurrencySettings currencySettings,
-            AuthorizeNetPaymentSettings authorizeNetPaymentSettings)
+            AuthorizeNetPaymentSettings authorizeNetPaymentSettings,
+            ILocalizationService localizationService)
         {
             this._authorizeNetPaymentSettings = authorizeNetPaymentSettings;
             this._settingService = settingService;
@@ -72,6 +73,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this._logger = logger;
             this._orderService = orderService;
             this._orderProcessingService = orderProcessingService;
+            this._localizationService = localizationService;
         }
 
         #endregion
@@ -91,8 +93,6 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 ItemElementName = ItemChoiceType.transactionKey,
                 Item = _authorizeNetPaymentSettings.TransactionKey
             };
-
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
         private static createTransactionResponse GetApiResponse(createTransactionController controller, IList<string> errors)
@@ -388,14 +388,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             var controller = new createTransactionController(request);
             controller.Execute();
 
-            var response = GetApiResponse(controller, result.Errors);
-
-            //validate
-            if (response == null)
-                return result;
-
-            var isOrderFullyRefunded = refundPaymentRequest.AmountToRefund + refundPaymentRequest.Order.RefundedAmount == refundPaymentRequest.Order.OrderTotal;
-            result.NewPaymentStatus = isOrderFullyRefunded ? PaymentStatus.Refunded : PaymentStatus.PartiallyRefunded;
+            GetApiResponse(controller, result.Errors);
+            result.NewPaymentStatus = PaymentStatus.PartiallyRefunded;
 
             return result;
         }
@@ -621,51 +615,58 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             // get the response from the service (errors contained if any)
             var response = controller.GetApiResponse();
 
-            if (response != null && response.messages.resultCode == messageTypeEnum.Ok)
+            if (response == null)
             {
-                var transaction = response.transaction;
-                if (transaction == null)
-                {
-                    _logger.Error(String.Format("Authorize.NET: Transaction data is missing (transactionId: {0})", transactionId));
-                    return;
-                }
+                _logger.Error(String.Format("Authorize.NET unknown error (transactionId: {0})", transactionId));
+                return;
+            }
 
-                if (transaction.transactionStatus == "refundTransaction")
-                {
-                    return;
-                }
+            var transaction = response.transaction;
+            if (transaction == null)
+            {
+                _logger.Error(String.Format("Authorize.NET: Transaction data is missing (transactionId: {0})", transactionId));
+                return;
+            }
 
-                var orderDescriptions = transaction.order.description.Split('#');
+            if (transaction.transactionStatus == "refundTransaction")
+            {
+                return;
+            }
 
-                if (orderDescriptions.Length < 2)
-                {
-                    _logger.Error(String.Format("Authorize.NET: Missing order GUID (transactionId: {0})", transactionId));
-                    return;
-                }
+            var orderDescriptions = transaction.order.description.Split('#');
 
-                var order = _orderService.GetOrderByGuid(new Guid(orderDescriptions[1]));
+            if (orderDescriptions.Length < 2)
+            {
+                _logger.Error(String.Format("Authorize.NET: Missing order GUID (transactionId: {0})", transactionId));
+                return;
+            }
 
-                if (order == null)
-                {
-                    _logger.Error(String.Format("Authorize.NET: Order cannot be loaded (order GUID: {0})", orderDescriptions[1]));
-                    return;
-                }
-                
-                var recurringPayments = _orderService.SearchRecurringPayments(initialOrderId: order.Id);
-                foreach (var rp in recurringPayments)
+            var order = _orderService.GetOrderByGuid(new Guid(orderDescriptions[1]));
+
+            if (order == null)
+            {
+                _logger.Error(String.Format("Authorize.NET: Order cannot be loaded (order GUID: {0})", orderDescriptions[1]));
+                return;
+            }
+
+            var recurringPayments = _orderService.SearchRecurringPayments(initialOrderId: order.Id);
+
+            foreach (var rp in recurringPayments)
+            {
+                if (response.messages.resultCode == messageTypeEnum.Ok)
                 {
                     var recurringPaymentHistory = rp.RecurringPaymentHistory;
                     var orders = _orderService.GetOrdersByIds(recurringPaymentHistory.Select(rph => rph.OrderId).ToArray()).ToList();
-                    
+
                     var transactionsIds = new List<string>();
-                    transactionsIds.AddRange(orders.Select(o => o.AuthorizationTransactionId).Where(tId=>!string.IsNullOrEmpty(tId)));
+                    transactionsIds.AddRange(orders.Select(o => o.AuthorizationTransactionId).Where(tId => !string.IsNullOrEmpty(tId)));
                     transactionsIds.AddRange(orders.Select(o => o.CaptureTransactionId).Where(tId => !string.IsNullOrEmpty(tId)));
 
                     //skip the re-processing of transactions
                     if (transactionsIds.Contains(transactionId))
                         continue;
 
-                    var newPaymentStatus =  transaction.transactionType == "authOnlyTransaction" ? PaymentStatus.Authorized : PaymentStatus.Paid;
+                    var newPaymentStatus = transaction.transactionType == "authOnlyTransaction" ? PaymentStatus.Authorized : PaymentStatus.Paid;
 
                     if (recurringPaymentHistory.Count == 0)
                     {
@@ -688,8 +689,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     else
                     {
                         //next payments
-                        var processPaymentResult = new ProcessPaymentResult();
-                        processPaymentResult.NewPaymentStatus = newPaymentStatus;
+                        var processPaymentResult = new ProcessPaymentResult
+                        {
+                            NewPaymentStatus = newPaymentStatus
+                        };
 
                         if (newPaymentStatus == PaymentStatus.Authorized)
                             processPaymentResult.AuthorizationTransactionId = transactionId;
@@ -699,15 +702,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                         _orderProcessingService.ProcessNextRecurringPayment(rp, processPaymentResult);
                     }
                 }
-
-            }
-            else if (response != null)
-            {
-                _logger.Error(String.Format("Authorize.Net Error: {0} - {1} (transactionId: {2})", response.messages.message[0].code, response.messages.message[0].text, transactionId));
-            }
-            else
-            {
-                _logger.Error(String.Format("Authorize.NET unknown error (transactionId: {0})", transactionId));
+                else
+                {
+                    var processPaymentResult = new ProcessPaymentResult();
+                    processPaymentResult.AuthorizationTransactionId = processPaymentResult.CaptureTransactionId = transactionId;
+                    processPaymentResult.RecurringPaymentFailed = true;
+                    processPaymentResult.Errors.Add(string.Format("Authorize.Net Error: {0} - {1} (transactionId: {2})", response.messages.message[0].code, response.messages.message[0].text, transactionId));
+                    _orderProcessingService.ProcessNextRecurringPayment(rp, processPaymentResult);
+                }
             }
         }
 
@@ -817,7 +819,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
-            
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription", "Pay by credit / debit card");
+
             base.Install();
         }
 
@@ -840,6 +843,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription");
             
             base.Uninstall();
         }
@@ -923,6 +927,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Gets a payment method description that will be displayed on checkout pages in the public store
+        /// </summary>
+        public string PaymentMethodDescription
+        {
+            get { return _localizationService.GetResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription"); }
         }
 
         #endregion
