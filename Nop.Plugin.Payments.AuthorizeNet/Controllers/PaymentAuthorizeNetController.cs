@@ -1,17 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Domain.Payments;
 using Nop.Plugin.Payments.AuthorizeNet.Models;
-using Nop.Plugin.Payments.AuthorizeNet.Validators;
 using Nop.Services;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Payments;
+using Nop.Services.Security;
 using Nop.Services.Stores;
+using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
+using Nop.Web.Framework.Mvc.Filters;
 
 namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
 {
@@ -23,13 +23,15 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
         private readonly IWorkContext _workContext;
         private readonly IPaymentService _paymentService;
         private readonly PaymentSettings _paymentSettings;
+        private readonly IPermissionService _permissionService;
         
         public PaymentAuthorizeNetController(ILocalizationService localizationService,
             ISettingService settingService,
             IStoreService storeService,
             IWorkContext workContext,
             IPaymentService paymentService,
-            PaymentSettings paymentSettings)
+            PaymentSettings paymentSettings,
+            IPermissionService permissionService)
         {
             this._localizationService = localizationService;
             this._settingService = settingService;
@@ -37,12 +39,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             this._workContext = workContext;
             this._paymentService = paymentService;
             this._paymentSettings = paymentSettings;
+            this._permissionService = permissionService;
         }
 
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure()
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        public IActionResult Configure()
         {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+                return AccessDeniedView();
+
             //load settings for a chosen store scope
             var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var authorizeNetPaymentSettings = _settingService.LoadSetting<AuthorizeNetPaymentSettings>(storeScope);
@@ -73,15 +79,18 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
         }
 
         [HttpPost]
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure(ConfigurationModel model)
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        public IActionResult Configure(ConfigurationModel model)
         {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+                return AccessDeniedView();
+
             if (!ModelState.IsValid)
                 return Configure();
 
             //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var authorizeNetPaymentSettings = _settingService.LoadSetting<AuthorizeNetPaymentSettings>(storeScope);
 
             //save settings
@@ -110,109 +119,25 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             return Configure();
         }
 
-        [ChildActionOnly]
-        public ActionResult PaymentInfo()
-        {
-            var model = new PaymentInfoModel();
-
-            //years
-            for (var i = 0; i < 15; i++)
-            {
-                var year = Convert.ToString(DateTime.Now.Year + i);
-                model.ExpireYears.Add(new SelectListItem
-                {
-                    Text = year,
-                    Value = year,
-                });
-            }
-
-            //months
-            for (var i = 1; i <= 12; i++)
-            {
-                var text = (i < 10) ? "0" + i : i.ToString();
-                model.ExpireMonths.Add(new SelectListItem
-                {
-                    Text = text,
-                    Value = i.ToString(),
-                });
-            }
-
-            //set postback values
-            var form = this.Request.Form;
-            model.CardholderName = form["CardholderName"];
-            model.CardNumber = form["CardNumber"];
-            model.CardCode = form["CardCode"];
-            var selectedMonth = model.ExpireMonths.FirstOrDefault(x => x.Value.Equals(form["ExpireMonth"], StringComparison.InvariantCultureIgnoreCase));
-
-            if (selectedMonth != null)
-                selectedMonth.Selected = true;
-
-            var selectedYear = model.ExpireYears.FirstOrDefault(x => x.Value.Equals(form["ExpireYear"], StringComparison.InvariantCultureIgnoreCase));
-
-            if (selectedYear != null)
-                selectedYear.Selected = true;
-
-            return View("~/Plugins/Payments.AuthorizeNet/Views/PaymentInfo.cshtml", model);
-        }
-
-        [NonAction]
-        public override IList<string> ValidatePaymentForm(FormCollection form)
-        {
-            var warnings = new List<string>();
-
-            //validate
-            var validator = new PaymentInfoValidator(_localizationService);
-            var model = new PaymentInfoModel
-            {
-                CardholderName = form["CardholderName"],
-                CardNumber = form["CardNumber"],
-                CardCode = form["CardCode"],
-                ExpireMonth = form["ExpireMonth"],
-                ExpireYear = form["ExpireYear"]
-            };
-
-            var validationResult = validator.Validate(model);
-
-            if (!validationResult.IsValid)
-                warnings.AddRange(validationResult.Errors.Select(error => error.ErrorMessage));
-
-            return warnings;
-        }
-
-        [NonAction]
-        public override ProcessPaymentRequest GetPaymentInfo(FormCollection form)
-        {
-            var paymentInfo = new ProcessPaymentRequest
-            {
-                //CreditCardType is not used by Authorize.NET
-                CreditCardName = form["CardholderName"],
-                CreditCardNumber = form["CardNumber"],
-                CreditCardExpireMonth = int.Parse(form["ExpireMonth"]),
-                CreditCardExpireYear = int.Parse(form["ExpireYear"]),
-                CreditCardCvv2 = form["CardCode"]
-            };
-
-            return paymentInfo;
-        }
-
-        [ValidateInput(false)]
-        public ActionResult IPNHandler(FormCollection form)
+        public IActionResult IPNHandler()
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AuthorizeNet") as AuthorizeNetPaymentProcessor;
             if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
                 throw new NopException("AuthorizeNet module cannot be loaded");
 
-            var responseCode = form.AllKeys.Contains("x_response_code") ? form["x_response_code"] : String.Empty;
+            var form = Request.Form;
+            
+            var responseCode = form.Keys.Contains("x_response_code") ? form["x_response_code"].ToString() : string.Empty;
 
             if (responseCode == "1")
             {
-                var transactionId = form.AllKeys.Contains("x_trans_id") ? form["x_trans_id"] : String.Empty;
+                var transactionId = form.Keys.Contains("x_trans_id") ? form["x_trans_id"].ToString() : string.Empty;
 
                 processor.ProcessRecurringPayment(transactionId);
             }
 
             //nothing should be rendered to visitor
-            return Content(String.Empty);
+            return Content(string.Empty);
         }
     }
 }

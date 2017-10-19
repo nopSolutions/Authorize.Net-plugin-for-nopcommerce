@@ -1,13 +1,13 @@
 ﻿@{
-    Layout = "";
+    Layout = "_ConfigurePlugin";
 }
+
 @model ConfigurationModel
 @using Nop.Plugin.Payments.AuthorizeNet.Models;
-@using Nop.Web.Framework;
-@Html.Action("StoreScopeConfiguration", "Setting", new { area = "Admin" })
-@using (Html.BeginForm())
-{
-    @Html.AntiForgeryToken()
+
+@await Component.InvokeAsync("StoreScopeConfiguration")
+
+<form asp-controller="PaymentAuthorizeNet" asp-action="Configure" method="post">
     <div class="panel-group">
         <div class="panel panel-default">
             <div class="panel-body">
@@ -22,66 +22,66 @@
                 </p>
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.OverrideStoreCheckboxFor(model => model.UseSandbox_OverrideForStore, model => model.UseSandbox, Model.ActiveStoreScopeConfiguration)
-                        @Html.NopLabelFor(model => model.UseSandbox)
+                        <nop-override-store-checkbox asp-for="UseSandbox_OverrideForStore" asp-input="UseSandbox" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="UseSandbox" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopEditorFor(model => model.UseSandbox)
-                        @Html.ValidationMessageFor(model => model.UseSandbox)
+                        <nop-editor asp-for="UseSandbox" />
+                        <span asp-validation-for="UseSandbox"></span>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.OverrideStoreCheckboxFor(model => model.TransactModeId_OverrideForStore, model => model.TransactModeId, Model.ActiveStoreScopeConfiguration)
-                        @Html.NopLabelFor(model => model.TransactModeValues)
+                        <nop-override-store-checkbox asp-for="TransactModeId_OverrideForStore" asp-input="TransactModeId" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="TransactModeId" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopDropDownList("TransactModeId", Model.TransactModeValues)
+                        <nop-select asp-for="TransactModeId" asp-items="Model.TransactModeValues"/>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.OverrideStoreCheckboxFor(model => model.TransactionKey_OverrideForStore, model => model.TransactionKey, Model.ActiveStoreScopeConfiguration)
-                        @Html.NopLabelFor(model => model.TransactionKey)
+                        <nop-override-store-checkbox asp-for="TransactionKey_OverrideForStore" asp-input="TransactionKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="TransactionKey" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopEditorFor(model => model.TransactionKey)
-                        @Html.ValidationMessageFor(model => model.TransactionKey)
+                        <nop-editor asp-for="TransactionKey" />
+                        <span asp-validation-for="TransactionKey"></span>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.OverrideStoreCheckboxFor(model => model.LoginId_OverrideForStore, model => model.LoginId, Model.ActiveStoreScopeConfiguration)
-                        @Html.NopLabelFor(model => model.LoginId)
+                        <nop-override-store-checkbox asp-for="LoginId_OverrideForStore" asp-input="LoginId" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="LoginId" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopEditorFor(model => model.LoginId)
-                        @Html.ValidationMessageFor(model => model.LoginId)
+                        <nop-editor asp-for="LoginId" />
+                        <span asp-validation-for="LoginId"></span>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.OverrideStoreCheckboxFor(model => model.AdditionalFee_OverrideForStore, model => model.AdditionalFee, Model.ActiveStoreScopeConfiguration)
-                        @Html.NopLabelFor(model => model.AdditionalFee)
+                        <nop-override-store-checkbox asp-for="AdditionalFee_OverrideForStore" asp-input="AdditionalFee" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="AdditionalFee" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopEditorFor(model => model.AdditionalFee)
-                        @Html.ValidationMessageFor(model => model.AdditionalFee)
+                        <nop-editor asp-for="AdditionalFee" />
+                        <span asp-validation-for="AdditionalFee"></span>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        @Html.OverrideStoreCheckboxFor(model => model.AdditionalFeePercentage_OverrideForStore, model => model.AdditionalFeePercentage, Model.ActiveStoreScopeConfiguration)
-                        @Html.NopLabelFor(model => model.AdditionalFeePercentage)
+                        <nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore" asp-input="AdditionalFeePercentage" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="AdditionalFeePercentage" />
                     </div>
                     <div class="col-md-9">
-                        @Html.NopEditorFor(model => model.AdditionalFeePercentage)
-                        @Html.ValidationMessageFor(model => model.AdditionalFeePercentage)
+                        <nop-editor asp-for="AdditionalFeePercentage" />
+                        <span asp-validation-for="AdditionalFeePercentage"></span>
                     </div>
                 </div>
 
@@ -90,10 +90,10 @@
                         &nbsp;
                     </div>
                     <div class="col-md-9">
-                        <input type="submit" name="save" class="btn bg-blue" value="@T("Admin.Common.Save")"/>
+                        <input type="submit" name="save" class="btn bg-blue" value="@T("Admin.Common.Save")" />
                     </div>
                 </div>
             </div>
         </div>
     </div>
-}
+</form>

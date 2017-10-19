@@ -1,6 +1,6 @@
-﻿using System.Web.Mvc;
-using Nop.Web.Framework;
-using Nop.Web.Framework.Mvc;
+﻿using Microsoft.AspNetCore.Mvc.Rendering;
+using Nop.Web.Framework.Mvc.ModelBinding;
+using Nop.Web.Framework.Mvc.Models;
 
 namespace Nop.Plugin.Payments.AuthorizeNet.Models
 {
@@ -12,9 +12,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Models
         public bool UseSandbox { get; set; }
         public bool UseSandbox_OverrideForStore { get; set; }
 
+        [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues")]
         public int TransactModeId { get; set; }
         public bool TransactModeId_OverrideForStore { get; set; }
-        [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues")]
         public SelectList TransactModeValues { get; set; }
 
         [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.TransactionKey")]

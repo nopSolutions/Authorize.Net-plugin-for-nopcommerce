@@ -1,20 +1,18 @@
-﻿using System.Web.Mvc;
-using System.Web.Routing;
-using Nop.Web.Framework.Mvc.Routes;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Nop.Web.Framework.Mvc.Routing;
 
 namespace Nop.Plugin.Payments.AuthorizeNet
 {
     public partial class RouteProvider : IRouteProvider
     {
-        public void RegisterRoutes(RouteCollection routes)
+        public void RegisterRoutes(IRouteBuilder routeBuilder)
         {
             //IPN
-            routes.MapRoute("Plugin.Payments.AuthorizeNet.IPNHandler",
-                 "Plugins/PaymentAuthorizeNet/IPNHandler",
-                 new { controller = "PaymentAuthorizeNet", action = "IPNHandler" },
-                 new[] { "Nop.Plugin.Payments.AuthorizeNet.Controllers" }
-            );
+            routeBuilder.MapRoute("Plugin.Payments.AuthorizeNet.IPNHandler", "Plugins/PaymentAuthorizeNet/IPNHandler",
+                new { controller = "PaymentAuthorizeNet", action = "IPNHandler" });
         }
+
         public int Priority
         {
             get
