@@ -102,12 +102,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (response != null)
             {
-                if (response.transactionResponse != null && response.transactionResponse.errors != null)
+                if (response.transactionResponse?.errors != null)
                 {
                     foreach (var transactionResponseError in response.transactionResponse.errors)
                     {
-                        errors.Add(string.Format("Error #{0}: {1}", transactionResponseError.errorCode,
-                            transactionResponseError.errorText));
+                        errors.Add($"Error #{transactionResponseError.errorCode}: {transactionResponseError.errorText}");
                     }
 
                     return null;
@@ -125,21 +124,19 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                         {
                             var description = response.transactionResponse.messages.Any()
                                 ? response.transactionResponse.messages.First().description
-                                : String.Empty;
-                            errors.Add(
-                                string.Format("Declined ({0}: {1})", response.transactionResponse.responseCode,
-                                    description).TrimEnd(':', ' '));
+                                : string.Empty;
+                            errors.Add($"Declined ({response.transactionResponse.responseCode}: {description})".TrimEnd(':', ' '));
                             return null;
                         }
                     }
                 }
                 else if (response.transactionResponse != null && response.messages.resultCode == messageTypeEnum.Error)
                 {
-                    if (response.messages != null && response.messages.message != null && response.messages.message.Any())
+                    if (response.messages?.message != null && response.messages.message.Any())
                     {
                         var message = response.messages.message.First();
 
-                        errors.Add(string.Format("Error #{0}: {1}", message.code, message.text));
+                        errors.Add($"Error #{message.code}: {message.text}");
                         return null;
                     }
                 }
@@ -147,17 +144,17 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             else
             {
                 var error = controller.GetErrorResponse();
-                if (error != null && error.messages != null && error.messages.message != null && error.messages.message.Any())
+                if (error?.messages?.message != null && error.messages.message.Any())
                 {
                     var message = error.messages.message.First();
 
-                    errors.Add(string.Format("Error #{0}: {1}", message.code, message.text));
+                    errors.Add($"Error #{message.code}: {message.text}");
                     return null;
                 }
             }
             var controllerResult = controller.GetResults().FirstOrDefault();
             const string unknownError = "Authorize.NET unknown error";
-            errors.Add(String.IsNullOrEmpty(controllerResult) ? unknownError : String.Format("{0} ({1})", unknownError, controllerResult));
+            errors.Add(string.IsNullOrEmpty(controllerResult) ? unknownError : $"{unknownError} ({controllerResult})");
             return null;
         }
         
@@ -233,7 +230,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 {
                     //x_invoice_num is 20 chars maximum. hece we also pass x_description
                     invoiceNumber = processPaymentRequest.OrderGuid.ToString().Substring(0, 20),
-                    description = string.Format("Full order #{0}", processPaymentRequest.OrderGuid)
+                    description = $"Full order #{processPaymentRequest.OrderGuid}"
                 }
             };
 
@@ -253,12 +250,15 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (_authorizeNetPaymentSettings.TransactMode == TransactMode.Authorize)
             {
                 result.AuthorizationTransactionId = response.transactionResponse.transId;
-                result.AuthorizationTransactionCode = string.Format("{0},{1}", response.transactionResponse.transId, response.transactionResponse.authCode);
+                result.AuthorizationTransactionCode =
+                    $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
             }
             if (_authorizeNetPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture)
-                result.CaptureTransactionId = string.Format("{0},{1}", response.transactionResponse.transId, response.transactionResponse.authCode);
+                result.CaptureTransactionId =
+                    $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
 
-            result.AuthorizationTransactionResult = string.Format("Approved ({0}: {1})", response.transactionResponse.responseCode, response.transactionResponse.messages[0].description);
+            result.AuthorizationTransactionResult =
+                $"Approved ({response.transactionResponse.responseCode}: {response.transactionResponse.messages[0].description})";
             result.AvsResult = response.transactionResponse.avsResultCode;
             result.NewPaymentStatus = _authorizeNetPaymentSettings.TransactMode == TransactMode.Authorize ? PaymentStatus.Authorized : PaymentStatus.Paid;
 
@@ -332,8 +332,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (response == null)
                 return result;
 
-            result.CaptureTransactionId = string.Format("{0},{1}", response.transactionResponse.transId, response.transactionResponse.authCode);
-            result.CaptureTransactionResult = string.Format("Approved ({0}: {1})", response.transactionResponse.responseCode, response.transactionResponse.messages[0].description);
+            result.CaptureTransactionId =
+                $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
+            result.CaptureTransactionResult =
+                $"Approved ({response.transactionResponse.responseCode}: {response.transactionResponse.messages[0].description})";
             result.NewPaymentStatus = PaymentStatus.Paid;
 
             return result;
@@ -352,7 +354,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             
             var maskedCreditCardNumberDecrypted = _encryptionService.DecryptText(refundPaymentRequest.Order.MaskedCreditCardNumber);
 
-            if (String.IsNullOrEmpty(maskedCreditCardNumberDecrypted) || maskedCreditCardNumberDecrypted.Length < 4)
+            if (string.IsNullOrEmpty(maskedCreditCardNumberDecrypted) || maskedCreditCardNumberDecrypted.Length < 4)
             {
                 result.AddError("Last four digits of Credit Card Not Available");
                 return result;
@@ -377,7 +379,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 {
                     //x_invoice_num is 20 chars maximum. hece we also pass x_description
                     invoiceNumber = refundPaymentRequest.Order.OrderGuid.ToString().Substring(0, 20),
-                    description = string.Format("Full order #{0}", refundPaymentRequest.Order.OrderGuid)
+                    description = $"Full order #{refundPaymentRequest.Order.OrderGuid}"
                 },
 
                 payment = new paymentType { Item = creditCard }
@@ -408,7 +410,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var maskedCreditCardNumberDecrypted = _encryptionService.DecryptText(voidPaymentRequest.Order.MaskedCreditCardNumber);
 
-            if (String.IsNullOrEmpty(maskedCreditCardNumberDecrypted) || maskedCreditCardNumberDecrypted.Length < 4)
+            if (string.IsNullOrEmpty(maskedCreditCardNumberDecrypted) || maskedCreditCardNumberDecrypted.Length < 4)
             {
                 result.AddError("Last four digits of Credit Card Not Available");
                 return result;
@@ -546,7 +548,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 {
                     //x_invoice_num is 20 chars maximum. hece we also pass x_description
                     invoiceNumber = processPaymentRequest.OrderGuid.ToString().Substring(0, 20),
-                    description = String.Format("Recurring payment #{0}", processPaymentRequest.OrderGuid)
+                    description = $"Recurring payment #{processPaymentRequest.OrderGuid}"
                 }
             };
 
@@ -583,13 +585,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             {
                 result.SubscriptionTransactionId = response.subscriptionId;
                 result.AuthorizationTransactionCode = response.refId;
-                result.AuthorizationTransactionResult = string.Format("Approved ({0}: {1})", response.refId, response.subscriptionId);
+                result.AuthorizationTransactionResult = $"Approved ({response.refId}: {response.subscriptionId})";
             }
             else if (response != null)
             {
                 foreach (var responseMessage in response.messages.message)
                 {
-                    result.AddError(string.Format("Error processing recurring payment #{0}: {1}", responseMessage.code, responseMessage.text));
+                    result.AddError(
+                        $"Error processing recurring payment #{responseMessage.code}: {responseMessage.text}");
                 }
             }
             else
@@ -618,14 +621,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (response == null)
             {
-                _logger.Error(String.Format("Authorize.NET unknown error (transactionId: {0})", transactionId));
+                _logger.Error($"Authorize.NET unknown error (transactionId: {transactionId})");
                 return;
             }
 
             var transaction = response.transaction;
             if (transaction == null)
             {
-                _logger.Error(String.Format("Authorize.NET: Transaction data is missing (transactionId: {0})", transactionId));
+                _logger.Error($"Authorize.NET: Transaction data is missing (transactionId: {transactionId})");
                 return;
             }
 
@@ -638,15 +641,18 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (orderDescriptions.Length < 2)
             {
-                _logger.Error(String.Format("Authorize.NET: Missing order GUID (transactionId: {0})", transactionId));
+                _logger.Error($"Authorize.NET: Missing order GUID (transactionId: {transactionId})");
                 return;
             }
+
+            if(orderDescriptions[0].Contains("Full order"))
+                return;
 
             var order = _orderService.GetOrderByGuid(new Guid(orderDescriptions[1]));
 
             if (order == null)
             {
-                _logger.Error(String.Format("Authorize.NET: Order cannot be loaded (order GUID: {0})", orderDescriptions[1]));
+                _logger.Error($"Authorize.NET: Order cannot be loaded (order GUID: {orderDescriptions[1]})");
                 return;
             }
 
@@ -708,7 +714,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     var processPaymentResult = new ProcessPaymentResult();
                     processPaymentResult.AuthorizationTransactionId = processPaymentResult.CaptureTransactionId = transactionId;
                     processPaymentResult.RecurringPaymentFailed = true;
-                    processPaymentResult.Errors.Add(string.Format("Authorize.Net Error: {0} - {1} (transactionId: {2})", response.messages.message[0].code, response.messages.message[0].text, transactionId));
+                    processPaymentResult.Errors.Add(
+                        $"Authorize.Net Error: {response.messages.message[0].code} - {response.messages.message[0].text} (transactionId: {transactionId})");
                     _orderProcessingService.ProcessNextRecurringPayment(rp, processPaymentResult);
                 }
             }
@@ -738,7 +745,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             {
                 foreach (var responseMessage in response.messages.message)
                 {
-                    result.AddError(string.Format("Error processing recurring payment #{0}: {1}", responseMessage.code, responseMessage.text));
+                    result.AddError(
+                        $"Error processing recurring payment #{responseMessage.code}: {responseMessage.text}");
                 }
             }
             else
@@ -757,7 +765,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         public bool CanRePostProcessPayment(Order order)
         {
             if (order == null)
-                throw new ArgumentNullException("order");
+                throw new ArgumentNullException(nameof(order));
             
             //it's not a redirection payment method. So we always return false
             return false;
