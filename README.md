@@ -1,9 +1,9 @@
 nopCommerce Authorize.Net plugin
 ===========
 
-nopCommerce site: [http://www.nopcommerce.com](http://www.nopcommerce.com)
+nopCommerce site: [https://www.nopcommerce.com](https://www.nopcommerce.com)
 
-Listing on nopCommerce "extensions and themes" catalog: [http://www.nopcommerce.com/p/2320/authorizenet-payment-module.aspx](http://www.nopcommerce.com/p/2320/authorizenet-payment-module.aspx)
+Listing on nopCommerce "extensions and themes" catalog: [https://www.nopcommerce.com/p/2320/authorizenet-payment-module.aspx](https://www.nopcommerce.com/p/2320/authorizenet-payment-module.aspx)
 
 Authorize.Net site: [http://www.authorize.net/](http://www.authorize.net/)
 
