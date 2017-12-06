@@ -8,6 +8,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         public TransactMode TransactMode { get; set; }
         public string TransactionKey { get; set; }
         public string LoginId { get; set; }
+        public bool UseShippingAddressAsBilling { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to "additional fee" is specified as percentage. true - percentage, false - fixed value.

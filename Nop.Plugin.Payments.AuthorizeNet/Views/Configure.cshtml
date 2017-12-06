@@ -30,6 +30,17 @@
                         <span asp-validation-for="UseSandbox"></span>
                     </div>
                 </div>
+                
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="UseShippingAddressAsBilling_OverrideForStore" asp-input="UseShippingAddressAsBilling" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="UseShippingAddressAsBilling" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="UseShippingAddressAsBilling" />
+                        <span asp-validation-for="UseShippingAddressAsBilling"></span>
+                    </div>
+                </div>
 
                 <div class="form-group">
                     <div class="col-md-3">

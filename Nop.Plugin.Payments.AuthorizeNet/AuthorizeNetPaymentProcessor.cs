@@ -23,6 +23,7 @@ using Nop.Services.Payments;
 using Nop.Services.Security;
 
 using AuthorizeNetSDK = AuthorizeNet;
+using Nop.Core.Domain.Common;
 
 namespace Nop.Plugin.Payments.AuthorizeNet
 {
@@ -157,6 +158,30 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             errors.Add(string.IsNullOrEmpty(controllerResult) ? unknownError : $"{unknownError} ({controllerResult})");
             return null;
         }
+
+        private static customerAddressType GetTransactionRequestAddress(Address address)
+        {
+            var transactionRequestAddress = new customerAddressType
+            {
+                firstName = address.FirstName,
+                lastName = address.LastName,
+                email = address.Email,
+                address = address.Address1,
+                city = address.City,
+                zip = address.ZipPostalCode
+            };
+
+            if (!string.IsNullOrEmpty(address.Company))
+                transactionRequestAddress.company = address.Company;
+
+            if (address.StateProvince != null)
+                transactionRequestAddress.state = address.StateProvince.Abbreviation;
+
+            if (address.Country != null)
+                transactionRequestAddress.country = address.Country.TwoLetterIsoCode;
+
+            return transactionRequestAddress;
+        }
         
         #endregion
 
@@ -199,24 +224,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     throw new NopException("Not supported transaction mode");
             }
 
-            var billTo = new customerAddressType
-            {
-                firstName = customer.BillingAddress.FirstName,
-                lastName = customer.BillingAddress.LastName,
-                email = customer.BillingAddress.Email,
-                address = customer.BillingAddress.Address1,
-                city = customer.BillingAddress.City,
-                zip = customer.BillingAddress.ZipPostalCode
-            };
-
-            if (!string.IsNullOrEmpty(customer.BillingAddress.Company))
-                billTo.company = customer.BillingAddress.Company;
-
-            if (customer.BillingAddress.StateProvince != null)
-                billTo.state = customer.BillingAddress.StateProvince.Abbreviation;
-
-            if (customer.BillingAddress.Country != null)
-                billTo.country = customer.BillingAddress.Country.TwoLetterIsoCode;
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddress != null ? GetTransactionRequestAddress(customer.ShippingAddress) : GetTransactionRequestAddress(customer.BillingAddress);
 
             var transactionRequest = new transactionRequestType
             {
@@ -233,6 +241,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     description = $"Full order #{processPaymentRequest.OrderGuid}"
                 }
             };
+
+            if (customer.ShippingAddress != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
+            {
+                var shipTo = GetTransactionRequestAddress(customer.ShippingAddress);
+                transactionRequest.shipTo = shipTo;
+            }
 
             var request = new createTransactionRequest { transactionRequest = transactionRequest };
 
@@ -477,26 +491,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             //standard api call to retrieve response
             var paymentType = new paymentType { Item = creditCard };
 
-            var billTo = new nameAndAddressType
-            {
-                firstName = customer.BillingAddress.FirstName,
-                lastName = customer.BillingAddress.LastName,
-                //email = customer.BillingAddress.Email,
-                address = customer.BillingAddress.Address1,
-                //address = customer.BillingAddress.Address1 + " " + customer.BillingAddress.Address2;
-                city = customer.BillingAddress.City,
-                zip = customer.BillingAddress.ZipPostalCode
-            };
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddress != null ? GetTransactionRequestAddress(customer.ShippingAddress) : GetTransactionRequestAddress(customer.BillingAddress);
 
-            if (!string.IsNullOrEmpty(customer.BillingAddress.Company))
-                billTo.company = customer.BillingAddress.Company;
-
-            if (customer.BillingAddress.StateProvince != null)
-                billTo.state = customer.BillingAddress.StateProvince.Abbreviation;
-
-            if (customer.BillingAddress.Country != null)
-                billTo.country = customer.BillingAddress.Country.TwoLetterIsoCode;
-            
             var dtNow = DateTime.UtcNow;
 
             // Interval can't be updated once a subscription is created.
@@ -543,7 +539,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     //phone number should be in one of following formats: 111- 111-1111 or (111) 111-1111.
                     //phoneNumber = customer.BillingAddress.PhoneNumber
                 },
-
+                
                 order = new orderType
                 {
                     //x_invoice_num is 20 chars maximum. hece we also pass x_description
@@ -552,22 +548,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 }
             };
 
-            if (customer.ShippingAddress != null)
+            if (customer.ShippingAddress != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
             {
-                var shipTo = new nameAndAddressType
-                {
-                    firstName = customer.ShippingAddress.FirstName,
-                    lastName = customer.ShippingAddress.LastName,
-                    address = customer.ShippingAddress.Address1,
-                    city = customer.ShippingAddress.City,
-                    zip = customer.ShippingAddress.ZipPostalCode
-                };
-
-                if (customer.ShippingAddress.StateProvince != null)
-                {
-                    shipTo.state = customer.ShippingAddress.StateProvince.Abbreviation;
-                }
-
+                var shipTo = GetTransactionRequestAddress(customer.ShippingAddress);
                 subscriptionType.shipTo = shipTo;
             }
 
@@ -852,6 +835,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Notes", "If you're using this gateway, ensure that your primary store currency is supported by Authorize.NET.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox", "Use Sandbox");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox.Hint", "Check to enable Sandbox (testing environment).");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling", "Use shipping address.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling.Hint", "Check if you want to use the shipping address as a billing address.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues", "Transaction mode");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues.Hint", "Choose transaction mode.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactionKey", "Transaction key");
@@ -879,6 +864,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Notes");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling");
+            this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactionKey");

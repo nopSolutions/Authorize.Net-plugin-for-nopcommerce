@@ -56,6 +56,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             var model = new ConfigurationModel
             {
                 UseSandbox = authorizeNetPaymentSettings.UseSandbox,
+                UseShippingAddressAsBilling = authorizeNetPaymentSettings.UseShippingAddressAsBilling,
                 TransactModeId = Convert.ToInt32(authorizeNetPaymentSettings.TransactMode),
                 TransactionKey = authorizeNetPaymentSettings.TransactionKey,
                 LoginId = authorizeNetPaymentSettings.LoginId,
@@ -68,6 +69,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             if (storeScope > 0)
             {
                 model.UseSandbox_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.UseSandbox, storeScope);
+                model.UseShippingAddressAsBilling_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.UseShippingAddressAsBilling, storeScope);
                 model.TransactModeId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.TransactMode, storeScope);
                 model.TransactionKey_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.TransactionKey, storeScope);
                 model.LoginId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.LoginId, storeScope);
@@ -95,6 +97,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
 
             //save settings
             authorizeNetPaymentSettings.UseSandbox = model.UseSandbox;
+            authorizeNetPaymentSettings.UseShippingAddressAsBilling = model.UseShippingAddressAsBilling;
             authorizeNetPaymentSettings.TransactMode = (TransactMode) model.TransactModeId;
             authorizeNetPaymentSettings.TransactionKey = model.TransactionKey;
             authorizeNetPaymentSettings.LoginId = model.LoginId;
@@ -105,6 +108,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
             _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.UseSandbox, model.UseSandbox_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.UseShippingAddressAsBilling, model.UseShippingAddressAsBilling_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.TransactionKey, model.TransactionKey_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.LoginId, model.LoginId_OverrideForStore, storeScope, false);

@@ -32,5 +32,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Models
         [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage")]
         public bool AdditionalFeePercentage { get; set; }
         public bool AdditionalFeePercentage_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling")]
+        public bool UseShippingAddressAsBilling { get; set; }
+        public bool UseShippingAddressAsBilling_OverrideForStore { get; set; }
     }
 }
