@@ -37,7 +37,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Components
             }
 
             //set postback values
-            var form = Request.Form;
+            var form = Request.Query;
             model.CardholderName = form["CardholderName"];
             model.CardNumber = form["CardNumber"];
             model.CardCode = form["CardCode"];
