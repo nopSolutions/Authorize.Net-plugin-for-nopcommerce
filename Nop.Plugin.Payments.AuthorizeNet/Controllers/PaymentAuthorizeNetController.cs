@@ -123,14 +123,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             return Configure();
         }
 
-        public IActionResult IPNHandler()
+        public IActionResult IPNHandler(IpnModel model)
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AuthorizeNet") as AuthorizeNetPaymentProcessor;
             if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) ||
                 !processor.PluginDescriptor.Installed)
                 throw new NopException("AuthorizeNet module cannot be loaded");
 
-            var form = Request.Form;
+            var form = model.Form;
 
             var responseCode = form.Keys.Contains("x_response_code") ? form["x_response_code"].ToString() : string.Empty;
 
