@@ -1,14 +1,12 @@
 ﻿using System;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
-using Nop.Core.Domain.Payments;
 using Nop.Plugin.Payments.AuthorizeNet.Models;
 using Nop.Services;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Payments;
 using Nop.Services.Security;
-using Nop.Services.Stores;
 using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
@@ -19,26 +17,20 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
     {
         private readonly ILocalizationService _localizationService;
         private readonly ISettingService _settingService;
-        private readonly IStoreService _storeService;
-        private readonly IWorkContext _workContext;
+        private readonly IStoreContext _storeContext;
         private readonly IPaymentService _paymentService;
-        private readonly PaymentSettings _paymentSettings;
         private readonly IPermissionService _permissionService;
-        
+
         public PaymentAuthorizeNetController(ILocalizationService localizationService,
             ISettingService settingService,
-            IStoreService storeService,
-            IWorkContext workContext,
+            IStoreContext storeContext,
             IPaymentService paymentService,
-            PaymentSettings paymentSettings,
             IPermissionService permissionService)
         {
             this._localizationService = localizationService;
             this._settingService = settingService;
-            this._storeService = storeService;
-            this._workContext = workContext;
+            this._storeContext = storeContext;
             this._paymentService = paymentService;
-            this._paymentSettings = paymentSettings;
             this._permissionService = permissionService;
         }
 
@@ -50,7 +42,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var authorizeNetPaymentSettings = _settingService.LoadSetting<AuthorizeNetPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
@@ -92,7 +84,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
                 return Configure();
 
             //load settings for a chosen store scope
-            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var authorizeNetPaymentSettings = _settingService.LoadSetting<AuthorizeNetPaymentSettings>(storeScope);
 
             //save settings
@@ -126,7 +118,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
         public IActionResult IPNHandler(IpnModel model)
         {
             var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AuthorizeNet") as AuthorizeNetPaymentProcessor;
-            if (processor == null || !processor.IsPaymentMethodActive(_paymentSettings) ||
+            if (processor == null || !_paymentService.IsPaymentMethodActive(processor) ||
                 !processor.PluginDescriptor.Installed)
                 throw new NopException("AuthorizeNet module cannot be loaded");
 

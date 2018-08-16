@@ -7,8 +7,8 @@ Important points when developing plugins
 
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework> 
-  </PropertyGroup>  
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <OutputPath>..\..\Presentation\Nop.Web\Plugins\PLUGIN_OUTPUT_DIRECTORY</OutputPath>
     <OutDir>$(OutputPath)</OutDir>
@@ -24,6 +24,6 @@ Important points when developing plugins
   </Target>
 </Project>
 
-Replace “PLUGIN_OUTPUT_DIRECTORY” in the code above with your real plugin output directory name. 
+Replace “PLUGIN_OUTPUT_DIRECTORY” in the code above with your real plugin output directory name.
 
-It’s not required. But this way we can use a new ASP.NET approach to add third-party references. It was introduced in .NET Core. Furthermore, references from already referenced libraries will be loaded automatically. It’s very convenient.
+It’s not required. But this way we can use a new ASP.NET approach to add third-party references. It was introduced in .NET Core.
