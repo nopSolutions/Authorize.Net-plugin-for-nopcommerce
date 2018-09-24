@@ -38,7 +38,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Components
             }
 
             //set postback values (we cannot access "Form" with "GET" requests)
-            if (Request.Method != WebRequestMethods.Http.Get)
+            if (Request.Method == WebRequestMethods.Http.Get)
                 return View("~/Plugins/Payments.AuthorizeNet/Views/PaymentInfo.cshtml", model);
 
             var form = Request.Form;
