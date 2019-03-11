@@ -37,8 +37,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="AuthorizeNet, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\AuthorizeNet.1.8.10\lib\AuthorizeNet.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\packages\AuthorizeNet.2.0.0\lib\AuthorizeNet.dll</HintPath>
     </Reference>
     <Reference Include="FluentValidation">
       <HintPath>..\..\packages\FluentValidation.5.6.2.0\lib\Net45\FluentValidation.dll</HintPath>
