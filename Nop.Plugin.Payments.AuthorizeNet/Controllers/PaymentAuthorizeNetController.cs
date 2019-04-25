@@ -63,7 +63,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
                 AdditionalFee = authorizeNetPaymentSettings.AdditionalFee,
                 AdditionalFeePercentage = authorizeNetPaymentSettings.AdditionalFeePercentage,
                 TransactModeValues = authorizeNetPaymentSettings.TransactMode.ToSelectList(),
-                ActiveStoreScopeConfiguration = storeScope
+                ActiveStoreScopeConfiguration = storeScope,
+                CustomBaseUrl = authorizeNetPaymentSettings.CustomBaseUrl,
+                CustomXmlBaseUrl = authorizeNetPaymentSettings.CustomXmlBaseUrl
             };
 
             if (storeScope > 0)
@@ -75,6 +77,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
                 model.LoginId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.LoginId, storeScope);
                 model.AdditionalFee_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFee, storeScope);
                 model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+                model.CustomBaseUrl_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.CustomBaseUrl, storeScope);
+                model.CustomXmlBaseUrl_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.CustomXmlBaseUrl, storeScope);
             }
 
             return View("~/Plugins/Payments.AuthorizeNet/Views/Configure.cshtml", model);
@@ -103,6 +107,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             authorizeNetPaymentSettings.LoginId = model.LoginId;
             authorizeNetPaymentSettings.AdditionalFee = model.AdditionalFee;
             authorizeNetPaymentSettings.AdditionalFeePercentage = model.AdditionalFeePercentage;
+            authorizeNetPaymentSettings.CustomBaseUrl = model.CustomBaseUrl;
+            authorizeNetPaymentSettings.CustomXmlBaseUrl = model.CustomXmlBaseUrl;
 
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
@@ -114,6 +120,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.LoginId, model.LoginId_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.CustomBaseUrl, model.CustomBaseUrl_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.CustomXmlBaseUrl, model.CustomXmlBaseUrl_OverrideForStore, storeScope, false);
 
             //now clear settings cache
             _settingService.ClearCache();

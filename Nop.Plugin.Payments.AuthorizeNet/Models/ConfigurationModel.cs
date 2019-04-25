@@ -36,5 +36,13 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Models
         [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling")]
         public bool UseShippingAddressAsBilling { get; set; }
         public bool UseShippingAddressAsBilling_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.CustomBaseUrl")]
+        public string CustomBaseUrl { get; set; }
+        public bool CustomBaseUrl_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Plugins.Payments.AuthorizeNet.Fields.CustomXmlBaseUrl")]
+        public string CustomXmlBaseUrl { get; set; }
+        public bool CustomXmlBaseUrl_OverrideForStore { get; set; }
     }
 }

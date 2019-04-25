@@ -84,9 +84,18 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
         private void PrepareAuthorizeNet()
         {
-            ApiOperationBase<ANetApiRequest, ANetApiResponse>.RunEnvironment = _authorizeNetPaymentSettings.UseSandbox
-                ? AuthorizeNetSDK.Environment.SANDBOX
-                : AuthorizeNetSDK.Environment.PRODUCTION;
+            if (!string.IsNullOrEmpty(_authorizeNetPaymentSettings.CustomBaseUrl) && !string.IsNullOrEmpty(_authorizeNetPaymentSettings.CustomXmlBaseUrl))
+            {
+                ApiOperationBase<ANetApiRequest, ANetApiResponse>.RunEnvironment = 
+                    AuthorizeNetSDK.Environment.createEnvironment(_authorizeNetPaymentSettings.CustomBaseUrl, _authorizeNetPaymentSettings.CustomXmlBaseUrl);
+            }
+            else
+            {
+                ApiOperationBase<ANetApiRequest, ANetApiResponse>.RunEnvironment = _authorizeNetPaymentSettings.UseSandbox
+                    ? AuthorizeNetSDK.Environment.SANDBOX
+                    : AuthorizeNetSDK.Environment.PRODUCTION;    
+            }
+            
 
             // define the merchant information (authentication / transaction id)
             ApiOperationBase<ANetApiRequest, ANetApiResponse>.MerchantAuthentication = new merchantAuthenticationType
@@ -847,6 +856,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomBaseUrl", "Custom Base URL");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomBaseUrl.Hint", "Specify a custom base URL");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomXmlBaseUrl", "Custom XML Base URL");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomXmlBaseUrl.Hint", "Specify a custom XML base URL");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription", "Pay by credit / debit card");
 
             base.Install();
@@ -876,6 +889,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomBaseUrl");
+            this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomBaseUrl.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomXmlBaseUrl");
+            this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.CustomXmlBaseUrl.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription");
             
             base.Uninstall();

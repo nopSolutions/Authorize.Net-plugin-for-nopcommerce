@@ -19,5 +19,15 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// Additional fee
         /// </summary>
         public decimal AdditionalFee { get; set; }
+
+        /// <summary>
+        /// Custom Base URL
+        /// </summary>
+        public string CustomBaseUrl { get; set; }
+
+        /// <summary>
+        /// Custom XML Base URL
+        /// </summary>
+        public string CustomXmlBaseUrl { get; set; }
     }
 }
