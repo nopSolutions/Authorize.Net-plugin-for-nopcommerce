@@ -13,12 +13,6 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 new { controller = "PaymentAuthorizeNet", action = "IPNHandler" });
         }
 
-        public int Priority
-        {
-            get
-            {
-                return 0;
-            }
-        }
+        public int Priority => 0;
     }
 }

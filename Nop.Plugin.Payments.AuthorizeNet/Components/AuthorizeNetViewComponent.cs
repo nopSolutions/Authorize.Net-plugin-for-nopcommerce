@@ -22,7 +22,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Components
                 model.ExpireYears.Add(new SelectListItem
                 {
                     Text = year,
-                    Value = year,
+                    Value = year
                 });
             }
 
@@ -33,7 +33,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Components
                 model.ExpireMonths.Add(new SelectListItem
                 {
                     Text = text,
-                    Value = i.ToString(),
+                    Value = i.ToString()
                 });
             }
 

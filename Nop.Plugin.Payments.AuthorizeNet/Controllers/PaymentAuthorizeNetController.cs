@@ -1,10 +1,12 @@
 ﻿using System;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Plugin.Payments.AuthorizeNet.Models;
 using Nop.Services;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
+using Nop.Services.Messages;
 using Nop.Services.Payments;
 using Nop.Services.Security;
 using Nop.Web.Framework;
@@ -16,22 +18,26 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
     public class PaymentAuthorizeNetController : BasePaymentController
     {
         private readonly ILocalizationService _localizationService;
+        private readonly INotificationService _notificationService;
         private readonly ISettingService _settingService;
         private readonly IStoreContext _storeContext;
-        private readonly IPaymentService _paymentService;
+        private readonly IPaymentPluginManager _paymentPluginManager;
         private readonly IPermissionService _permissionService;
 
         public PaymentAuthorizeNetController(ILocalizationService localizationService,
+            INotificationService notificationService,
             ISettingService settingService,
             IStoreContext storeContext,
+            IPaymentPluginManager paymentPluginManager,
             IPaymentService paymentService,
             IPermissionService permissionService)
         {
-            this._localizationService = localizationService;
-            this._settingService = settingService;
-            this._storeContext = storeContext;
-            this._paymentService = paymentService;
-            this._permissionService = permissionService;
+            _localizationService = localizationService;
+            _notificationService = notificationService;
+            _settingService = settingService;
+            _storeContext = storeContext;
+            _paymentPluginManager = paymentPluginManager;
+            _permissionService = permissionService;
         }
 
         [AuthorizeAdmin]
@@ -90,7 +96,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             //save settings
             authorizeNetPaymentSettings.UseSandbox = model.UseSandbox;
             authorizeNetPaymentSettings.UseShippingAddressAsBilling = model.UseShippingAddressAsBilling;
-            authorizeNetPaymentSettings.TransactMode = (TransactMode) model.TransactModeId;
+            authorizeNetPaymentSettings.TransactMode = (TransactMode)model.TransactModeId;
             authorizeNetPaymentSettings.TransactionKey = model.TransactionKey;
             authorizeNetPaymentSettings.LoginId = model.LoginId;
             authorizeNetPaymentSettings.AdditionalFee = model.AdditionalFee;
@@ -110,19 +116,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             //now clear settings cache
             _settingService.ClearCache();
 
-            SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
             return Configure();
         }
 
-        public IActionResult IPNHandler(IpnModel model)
+        public IActionResult IPNHandler(IpnModel model, IFormCollection form)
         {
-            var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.AuthorizeNet") as AuthorizeNetPaymentProcessor;
-            if (processor == null || !_paymentService.IsPaymentMethodActive(processor) ||
+            if (!(_paymentPluginManager.LoadPluginBySystemName("Payments.AuthorizeNet") is AuthorizeNetPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor) ||
                 !processor.PluginDescriptor.Installed)
                 throw new NopException("AuthorizeNet module cannot be loaded");
-
-            var form = model.Form;
 
             var responseCode = form.Keys.Contains("x_response_code") ? form["x_response_code"].ToString() : string.Empty;
 

@@ -7,10 +7,10 @@ using AuthorizeNet.Api.Controllers.Bases;
 using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Domain.Catalog;
+using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
-using Nop.Core.Plugins;
 using Nop.Plugin.Payments.AuthorizeNet.Models;
 using Nop.Plugin.Payments.AuthorizeNet.Validators;
 using Nop.Services.Configuration;
@@ -20,10 +20,10 @@ using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
+using Nop.Services.Plugins;
 using Nop.Services.Security;
 
 using AuthorizeNetSDK = AuthorizeNet;
-using Nop.Core.Domain.Common;
 
 namespace Nop.Plugin.Payments.AuthorizeNet
 {
@@ -64,43 +64,28 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             ISettingService settingService,
             IWebHelper webHelper)
         {
-            this._authorizeNetPaymentSettings = authorizeNetPaymentSettings;
-            this._currencySettings = currencySettings;
-            this._currencyService = currencyService;
-            this._customerService = customerService;
-            this._encryptionService = encryptionService;
-            this._localizationService = localizationService;
-            this._logger = logger;
-            this._orderProcessingService = orderProcessingService;
-            this._orderService = orderService;
-            this._paymentService = paymentService;
-            this._settingService = settingService;
-            this._webHelper = webHelper;
+            _authorizeNetPaymentSettings = authorizeNetPaymentSettings;
+            _currencySettings = currencySettings;
+            _currencyService = currencyService;
+            _customerService = customerService;
+            _encryptionService = encryptionService;
+            _localizationService = localizationService;
+            _logger = logger;
+            _orderProcessingService = orderProcessingService;
+            _orderService = orderService;
+            _paymentService = paymentService;
+            _settingService = settingService;
+            _webHelper = webHelper;
         }
 
         #endregion
 
         #region Utilities
 
-        private void PrepareAuthorizeNet()
-        {
-            ApiOperationBase<ANetApiRequest, ANetApiResponse>.RunEnvironment = _authorizeNetPaymentSettings.UseSandbox
-                ? AuthorizeNetSDK.Environment.SANDBOX
-                : AuthorizeNetSDK.Environment.PRODUCTION;
-
-            // define the merchant information (authentication / transaction id)
-            ApiOperationBase<ANetApiRequest, ANetApiResponse>.MerchantAuthentication = new merchantAuthenticationType
-            {
-                name = _authorizeNetPaymentSettings.LoginId,
-                ItemElementName = ItemChoiceType.transactionKey,
-                Item = _authorizeNetPaymentSettings.TransactionKey
-            };
-        }
-
         private static createTransactionResponse GetApiResponse(createTransactionController controller, IList<string> errors)
         {
             var response = controller.GetApiResponse();
-
+            
             if (response != null)
             {
                 if (response.transactionResponse?.errors != null)
@@ -118,17 +103,13 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     switch (response.transactionResponse.responseCode)
                     {
                         case "1":
-                        {
                             return response;
-                        }
                         case "2":
-                        {
                             var description = response.transactionResponse.messages.Any()
                                 ? response.transactionResponse.messages.First().description
                                 : string.Empty;
                             errors.Add($"Declined ({response.transactionResponse.responseCode}: {description})".TrimEnd(':', ' '));
                             return null;
-                        }
                     }
                 }
                 else if (response.transactionResponse != null && response.messages.resultCode == messageTypeEnum.Error)
@@ -153,9 +134,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     return null;
                 }
             }
+
             var controllerResult = controller.GetResults().FirstOrDefault();
+
             const string unknownError = "Authorize.NET unknown error";
             errors.Add(string.IsNullOrEmpty(controllerResult) ? unknownError : $"{unknownError} ({controllerResult})");
+            
             return null;
         }
 
@@ -204,6 +188,21 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 transactionRequestAddress.country = address.Country.TwoLetterIsoCode;
 
             return transactionRequestAddress;
+        }
+
+        private void PrepareAuthorizeNet()
+        {
+            ApiOperationBase<ANetApiRequest, ANetApiResponse>.RunEnvironment = _authorizeNetPaymentSettings.UseSandbox
+                ? AuthorizeNetSDK.Environment.SANDBOX
+                : AuthorizeNetSDK.Environment.PRODUCTION;
+
+            // define the merchant information (authentication / transaction id)
+            ApiOperationBase<ANetApiRequest, ANetApiResponse>.MerchantAuthentication = new merchantAuthenticationType
+            {
+                name = _authorizeNetPaymentSettings.LoginId,
+                ItemElementName = ItemChoiceType.transactionKey,
+                Item = _authorizeNetPaymentSettings.TransactionKey
+            };
         }
 
         #endregion
@@ -259,7 +258,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 customerIP = _webHelper.GetCurrentIpAddress(),
                 order = new orderType
                 {
-                    //x_invoice_num is 20 chars maximum. hece we also pass x_description
+                    //x_invoice_num is 20 chars maximum. Hence we also pass x_description
                     invoiceNumber = processPaymentRequest.OrderGuid.ToString().Substring(0, 20),
                     description = $"Full order #{processPaymentRequest.OrderGuid}"
                 }
@@ -273,7 +272,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var request = new createTransactionRequest { transactionRequest = transactionRequest };
 
-            // instantiate the contoller that will call the service
+            // instantiate the controller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
 
@@ -290,6 +289,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 result.AuthorizationTransactionCode =
                     $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
             }
+
             if (_authorizeNetPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture)
                 result.CaptureTransactionId =
                     $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
@@ -314,7 +314,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <summary>
         /// Gets additional handling fee
         /// </summary>
-        /// <param name="cart">Shoping cart</param>
+        /// <param name="cart">Shopping cart</param>
         /// <returns>Additional handling fee</returns>
         public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
         {
@@ -326,7 +326,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <summary>
         /// Returns a value indicating whether payment method should be hidden during checkout
         /// </summary>
-        /// <param name="cart">Shoping cart</param>
+        /// <param name="cart">Shopping cart</param>
         /// <returns>true - hide; false - display.</returns>
         public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
         {
@@ -353,16 +353,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 transactionType = transactionTypeEnum.priorAuthCaptureTransaction.ToString(),
                 amount = Math.Round(capturePaymentRequest.Order.OrderTotal, 2),
                 refTransId = codes[0],
-                currencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode,
+                currencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode
             };
 
             var request = new createTransactionRequest { transactionRequest = transactionRequest };
 
-            // instantiate the contoller that will call the service
+            //instantiate the controller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
 
-            // get the response from the service (errors contained if any)
+            //get the response from the service (errors contained if any)
             var response = GetApiResponse(controller, result.Errors);
 
             //validate
@@ -414,7 +414,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
                 order = new orderType
                 {
-                    //x_invoice_num is 20 chars maximum. hece we also pass x_description
+                    //x_invoice_num is 20 chars maximum. Hence we also pass x_description
                     invoiceNumber = refundPaymentRequest.Order.OrderGuid.ToString().Substring(0, 20),
                     description = $"Full order #{refundPaymentRequest.Order.OrderGuid}"
                 },
@@ -424,7 +424,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var request = new createTransactionRequest { transactionRequest = transactionRequest };
 
-            // instantiate the contoller that will call the service
+            // instantiate the controller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
 
@@ -475,7 +475,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var request = new createTransactionRequest { transactionRequest = transactionRequest };
 
-            // instantiate the contoller that will call the service
+            // instantiate the controller that will call the service
             var controller = new createTransactionController(request);
             controller.Execute();
 
@@ -565,7 +565,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 
                 order = new orderType
                 {
-                    //x_invoice_num is 20 chars maximum. hece we also pass x_description
+                    //x_invoice_num is 20 chars maximum. Hence we also pass x_description
                     invoiceNumber = processPaymentRequest.OrderGuid.ToString().Substring(0, 20),
                     description = $"Recurring payment #{processPaymentRequest.OrderGuid}"
                 }
@@ -579,7 +579,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var request = new ARBCreateSubscriptionRequest { subscription = subscriptionType };
 
-            // instantiate the contoller that will call the service
+            // instantiate the controller that will call the service
             var controller = new ARBCreateSubscriptionController(request);
             controller.Execute();
 
@@ -651,7 +651,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 return;
             }
 
-            if(orderDescriptions[0].Contains("Full order"))
+            if (orderDescriptions[0].Contains("Full order"))
                 return;
 
             var order = _orderService.GetOrderByGuid(new Guid(orderDescriptions[1]));
@@ -828,7 +828,6 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <summary>
         /// Gets a view component for displaying plugin in public store ("payment info" checkout step)
         /// </summary>
-        /// <param name="viewComponentName">View component name</param>
         public string GetPublicViewComponentName()
         {
             return "AuthorizeNet";
@@ -911,87 +910,42 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <summary>
         /// Gets a value indicating whether capture is supported
         /// </summary>
-        public bool SupportCapture
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportCapture => true;
 
         /// <summary>
         /// Gets a value indicating whether partial refund is supported
         /// </summary>
-        public bool SupportPartiallyRefund
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportPartiallyRefund => true;
 
         /// <summary>
         /// Gets a value indicating whether refund is supported
         /// </summary>
-        public bool SupportRefund
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportRefund => true;
 
         /// <summary>
         /// Gets a value indicating whether void is supported
         /// </summary>
-        public bool SupportVoid
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportVoid => true;
 
         /// <summary>
         /// Gets a recurring payment type of payment method
         /// </summary>
-        public RecurringPaymentType RecurringPaymentType
-        {
-            get
-            {
-                return RecurringPaymentType.Automatic;
-            }
-        }
+        public RecurringPaymentType RecurringPaymentType => RecurringPaymentType.Automatic;
 
         /// <summary>
         /// Gets a payment method type
         /// </summary>
-        public PaymentMethodType PaymentMethodType
-        {
-            get
-            {
-                return PaymentMethodType.Standard;
-            }
-        }
+        public PaymentMethodType PaymentMethodType => PaymentMethodType.Standard;
 
         /// <summary>
         /// Gets a value indicating whether we should display a payment information page for this plugin
         /// </summary>
-        public bool SkipPaymentInfo
-        {
-            get
-            {
-                return false;
-            }
-        }
+        public bool SkipPaymentInfo => false;
 
         /// <summary>
         /// Gets a payment method description that will be displayed on checkout pages in the public store
         /// </summary>
-        public string PaymentMethodDescription
-        {
-            get { return _localizationService.GetResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription"); }
-        }
+        public string PaymentMethodDescription => _localizationService.GetResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription");
 
         #endregion
     }
