@@ -205,6 +205,46 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             };
         }
 
+        protected virtual TransactionDetails GetTransactionDetails(string transactionId)
+        {
+            PrepareAuthorizeNet();
+
+            var request = new getTransactionDetailsRequest {transId = transactionId};
+
+            // instantiate the controller that will call the service
+            var controller = new getTransactionDetailsController(request);
+            controller.Execute();
+
+            // get the response from the service (errors contained if any)
+            var response = controller.GetApiResponse();
+
+            if (response?.messages == null)
+            {
+                _logger.Error($"Authorize.NET unknown error (transactionId: {transactionId})");
+
+                return new TransactionDetails { IsOk = false };
+            }
+
+            var transactionDetails = new TransactionDetails
+            {
+                IsOk = response.messages.resultCode == messageTypeEnum.Ok,
+                Message = response.messages.message.FirstOrDefault()
+            };
+
+            if (response.transaction == null)
+            {
+                _logger.Error($"Authorize.NET: Transaction data is missing (transactionId: {transactionId})");
+            }
+            else
+            {
+                transactionDetails.TransactionStatus = response.transaction.transactionStatus;
+                transactionDetails.OrderDescriptions = response.transaction.order.description.Split('#');
+                transactionDetails.TransactionType = response.transaction.transactionType;
+            }
+
+            return transactionDetails;
+        }
+
         #endregion
 
         #region Methods
@@ -387,8 +427,45 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         {
             var result = new RefundPaymentResult();
 
-            PrepareAuthorizeNet();
+            var codes = (string.IsNullOrEmpty(refundPaymentRequest.Order.CaptureTransactionId)
+                ? refundPaymentRequest.Order.AuthorizationTransactionCode
+                : refundPaymentRequest.Order.CaptureTransactionId).Split(',');
+
+            var transactionId = codes[0];
+
+            var transactionDetails = GetTransactionDetails(transactionId);
+
+            if (transactionDetails.TransactionStatus == "capturedPendingSettlement")
+            {
+                if (refundPaymentRequest.IsPartialRefund)
+                {
+                    result.Errors.Add("This transaction is supports only full refund");
+
+                    return result;
+                }
+
+                var voidResult = Void(new VoidPaymentRequest
+                {
+                    Order = refundPaymentRequest.Order
+                });
+
+                if (!voidResult.Success)
+                {
+                    foreach (var voidResultError in voidResult.Errors)
+                    {
+                        result.Errors.Add(voidResultError);
+                    }
+
+                    return result;
+                }
+
+                result.NewPaymentStatus = PaymentStatus.Refunded;
+
+                return result;
+            }
             
+            PrepareAuthorizeNet();
+
             var maskedCreditCardNumberDecrypted = _encryptionService.DecryptText(refundPaymentRequest.Order.MaskedCreditCardNumber);
 
             if (string.IsNullOrEmpty(maskedCreditCardNumberDecrypted) || maskedCreditCardNumberDecrypted.Length < 4)
@@ -404,12 +481,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 expirationDate = "XXXX"
             };
 
-            var codes = (string.IsNullOrEmpty(refundPaymentRequest.Order.CaptureTransactionId) ? refundPaymentRequest.Order.AuthorizationTransactionCode : refundPaymentRequest.Order.CaptureTransactionId).Split(',');
             var transactionRequest = new transactionRequestType
             {
                 transactionType = transactionTypeEnum.refundTransaction.ToString(),
                 amount = Math.Round(refundPaymentRequest.AmountToRefund, 2),
-                refTransId = codes[0],
+                refTransId = transactionId,
                 currencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode,
 
                 order = new orderType
@@ -433,7 +509,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             return result;
         }
-        
+
         /// <summary>
         /// Voids a payment
         /// </summary>
@@ -615,35 +691,15 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <param name="transactionId">AuthorizeNet transaction ID</param>
         public void ProcessRecurringPayment(string transactionId)
         {
-            PrepareAuthorizeNet();
-            var request = new getTransactionDetailsRequest { transId = transactionId };
+            
+            var transactionDetails = GetTransactionDetails(transactionId);
 
-            // instantiate the controller that will call the service
-            var controller = new getTransactionDetailsController(request);
-            controller.Execute();
-
-            // get the response from the service (errors contained if any)
-            var response = controller.GetApiResponse();
-
-            if (response == null)
-            {
-                _logger.Error($"Authorize.NET unknown error (transactionId: {transactionId})");
-                return;
-            }
-
-            var transaction = response.transaction;
-            if (transaction == null)
-            {
-                _logger.Error($"Authorize.NET: Transaction data is missing (transactionId: {transactionId})");
-                return;
-            }
-
-            if (transaction.transactionStatus == "refundTransaction")
+            if (transactionDetails.TransactionStatus == "refundTransaction")
             {
                 return;
             }
 
-            var orderDescriptions = transaction.order.description.Split('#');
+            var orderDescriptions = transactionDetails.OrderDescriptions;
 
             if (orderDescriptions.Length < 2)
             {
@@ -666,7 +722,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             foreach (var rp in recurringPayments)
             {
-                if (response.messages.resultCode == messageTypeEnum.Ok)
+                if (transactionDetails.IsOk)
                 {
                     var recurringPaymentHistory = rp.RecurringPaymentHistory;
                     var orders = _orderService.GetOrdersByIds(recurringPaymentHistory.Select(rph => rph.OrderId).ToArray()).ToList();
@@ -679,7 +735,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     if (transactionsIds.Contains(transactionId))
                         continue;
 
-                    var newPaymentStatus = transaction.transactionType == "authOnlyTransaction" ? PaymentStatus.Authorized : PaymentStatus.Paid;
+                    var newPaymentStatus = transactionDetails.TransactionType == "authOnlyTransaction" ? PaymentStatus.Authorized : PaymentStatus.Paid;
 
                     if (recurringPaymentHistory.Count == 0)
                     {
@@ -721,7 +777,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     processPaymentResult.AuthorizationTransactionId = processPaymentResult.CaptureTransactionId = transactionId;
                     processPaymentResult.RecurringPaymentFailed = true;
                     processPaymentResult.Errors.Add(
-                        $"Authorize.Net Error: {response.messages.message[0].code} - {response.messages.message[0].text} (transactionId: {transactionId})");
+                        $"Authorize.Net Error: {transactionDetails.Message?.code} - {transactionDetails.Message?.text} (transactionId: {transactionId})");
                     _orderProcessingService.ProcessNextRecurringPayment(rp, processPaymentResult);
                 }
             }
@@ -946,6 +1002,23 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// Gets a payment method description that will be displayed on checkout pages in the public store
         /// </summary>
         public string PaymentMethodDescription => _localizationService.GetResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription");
+
+        #endregion
+
+        #region Nested classes
+
+        protected partial class TransactionDetails
+        {
+            public bool IsOk { get; set; }
+
+            public string TransactionStatus { get; internal set; }
+
+            public string[] OrderDescriptions { get; internal set; }
+
+            public messagesTypeMessage Message { get; internal set; }
+
+            public string TransactionType { get; set; }
+        }
 
         #endregion
     }
