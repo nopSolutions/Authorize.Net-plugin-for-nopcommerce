@@ -137,6 +137,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var controllerResult = controller.GetResults().FirstOrDefault();
 
+            if (controllerResult?.StartsWith("I00001", StringComparison.InvariantCultureIgnoreCase) ?? false)
+                return null;
+
             const string unknownError = "Authorize.NET unknown error";
             errors.Add(string.IsNullOrEmpty(controllerResult) ? unknownError : $"{unknownError} ({controllerResult})");
             
@@ -691,7 +694,6 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <param name="transactionId">AuthorizeNet transaction ID</param>
         public void ProcessRecurringPayment(string transactionId)
         {
-            
             var transactionDetails = GetTransactionDetails(transactionId);
 
             if (transactionDetails.TransactionStatus == "refundTransaction")
