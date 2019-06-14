@@ -9,6 +9,7 @@
     <PackageProjectUrl>https://www.nopcommerce.com/p/2320/authorizenet-payment-module.aspx</PackageProjectUrl> 
     <RepositoryUrl>https://github.com/nopSolutions/Authorize.Net-plugin-for-nopcommerce</RepositoryUrl> 
     <RepositoryType>Git</RepositoryType>
+    <OutDir>$(OutputPath)</OutDir>
   </PropertyGroup>
   
   <ItemGroup>
@@ -18,17 +19,7 @@
     <None Remove="Views\PaymentInfo.cshtml" />
   </ItemGroup>
   
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <OutputPath>..\..\Presentation\Nop.Web\Plugins\Payments.AuthorizeNet</OutputPath>
-    <OutDir>$(OutputPath)</OutDir>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <OutputPath>..\..\Presentation\Nop.Web\Plugins\Payments.AuthorizeNet</OutputPath>
-    <OutDir>$(OutputPath)</OutDir>
-  </PropertyGroup>
-
-  <ItemGroup>
+   <ItemGroup>
     <Content Include="logo.jpg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
