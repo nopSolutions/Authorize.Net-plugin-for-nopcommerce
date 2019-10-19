@@ -297,6 +297,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             result.AuthorizationTransactionResult =
                 $"Approved ({response.transactionResponse.responseCode}: {response.transactionResponse.messages[0].description})";
             result.AvsResult = response.transactionResponse.avsResultCode;
+            result.Cvv2Result = response.transactionResponse.cvvResultCode;
             result.NewPaymentStatus = _authorizeNetPaymentSettings.TransactMode == TransactMode.Authorize ? PaymentStatus.Authorized : PaymentStatus.Paid;
 
             return result;
