@@ -1,26 +1,35 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <Copyright>Copyright © Nop Solutions, Ltd</Copyright> 
     <Company>Nop Solutions, Ltd</Company> 
     <Authors>Nop Solutions, Ltd</Authors> 
-    <PackageLicenseUrl></PackageLicenseUrl> 
-    <PackageProjectUrl>https://www.nopcommerce.com/p/2320/authorizenet-payment-module.aspx</PackageProjectUrl> 
-    <RepositoryUrl>https://github.com/nopSolutions/Authorize.Net-plugin-for-nopcommerce</RepositoryUrl> 
+    <PackageLicenseUrl></PackageLicenseUrl>
+    <PackageProjectUrl>https://www.nopcommerce.com/authorizenet-payment-module</PackageProjectUrl>
+    <RepositoryUrl>https://www.nopcommerce.com/authorizenet-payment-module</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
+    <OutputPath>..\..\Presentation\Nop.Web\Plugins\Payments.AuthorizeNet</OutputPath>
     <OutDir>$(OutputPath)</OutDir>
+    <!--Set this parameter to true to get the dlls copied from the NuGet cache to the output of your project.
+    You need to set this parameter to true if your plugin has a nuget package 
+    to ensure that the dlls copied from the NuGet cache to the output of your project-->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   
   <ItemGroup>
-    <None Remove="logo.jpg" />
+    <None Remove="AuthorizeNet.dll" />
+    <None Remove="logo.png" />
     <None Remove="plugin.json" />
     <None Remove="Views\Configure.cshtml" />
     <None Remove="Views\PaymentInfo.cshtml" />
   </ItemGroup>
   
    <ItemGroup>
-    <Content Include="logo.jpg">
+    <Content Include="AuthorizeNet.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="logo.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="plugin.json">

@@ -6,10 +6,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 {
     public partial class RouteProvider : IRouteProvider
     {
-        public void RegisterRoutes(IRouteBuilder routeBuilder)
+        /// <summary>
+        /// Register routes
+        /// </summary>
+        /// <param name="endpointRouteBuilder">Route builder</param>
+        public void RegisterRoutes(IEndpointRouteBuilder endpointRouteBuilder)
         {
             //IPN
-            routeBuilder.MapRoute("Plugin.Payments.AuthorizeNet.IPNHandler", "Plugins/PaymentAuthorizeNet/IPNHandler",
+            endpointRouteBuilder.MapControllerRoute("Plugin.Payments.AuthorizeNet.IPNHandler", "Plugins/PaymentAuthorizeNet/IPNHandler",
                 new { controller = "PaymentAuthorizeNet", action = "IPNHandler" });
         }
 

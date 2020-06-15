@@ -7,12 +7,12 @@ using AuthorizeNet.Api.Controllers.Bases;
 using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Domain.Catalog;
-using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Plugin.Payments.AuthorizeNet.Models;
 using Nop.Plugin.Payments.AuthorizeNet.Validators;
+using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
 using Nop.Services.Directory;
@@ -36,6 +36,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
         private readonly AuthorizeNetPaymentSettings _authorizeNetPaymentSettings;
         private readonly CurrencySettings _currencySettings;
+        private readonly IAddressService _addressService;
+        private readonly ICountryService _countryService;
         private readonly ICurrencyService _currencyService;
         private readonly ICustomerService _customerService;
         private readonly IEncryptionService _encryptionService;
@@ -44,6 +46,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IOrderService _orderService;
         private readonly IPaymentService _paymentService;
+        private readonly IStateProvinceService _stateProvinceService;
         private readonly ISettingService _settingService;
         private readonly IWebHelper _webHelper;
 
@@ -53,6 +56,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
         public AuthorizeNetPaymentProcessor(AuthorizeNetPaymentSettings authorizeNetPaymentSettings,
             CurrencySettings currencySettings,
+            IAddressService addressService,
+            ICountryService countryService,
             ICurrencyService currencyService,
             ICustomerService customerService,
             IEncryptionService encryptionService,
@@ -61,11 +66,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             IOrderProcessingService orderProcessingService,
             IOrderService orderService,
             IPaymentService paymentService,
+            IStateProvinceService stateProvinceService,
             ISettingService settingService,
             IWebHelper webHelper)
         {
             _authorizeNetPaymentSettings = authorizeNetPaymentSettings;
             _currencySettings = currencySettings;
+            _addressService = addressService;
+            _countryService = countryService;
             _currencyService = currencyService;
             _customerService = customerService;
             _encryptionService = encryptionService;
@@ -74,6 +82,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             _orderProcessingService = orderProcessingService;
             _orderService = orderService;
             _paymentService = paymentService;
+            _stateProvinceService = stateProvinceService;
             _settingService = settingService;
             _webHelper = webHelper;
         }
@@ -146,8 +155,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             return null;
         }
 
-        private static customerAddressType GetTransactionRequestAddress(Address address)
+        protected virtual customerAddressType GetTransactionRequestAddress(int addressId)
         {
+            var address = _addressService.GetAddressById(addressId);
+
             var transactionRequestAddress = new customerAddressType
             {
                 firstName = address.FirstName,
@@ -161,17 +172,19 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (!string.IsNullOrEmpty(address.Company))
                 transactionRequestAddress.company = address.Company;
 
-            if (address.StateProvince != null)
-                transactionRequestAddress.state = address.StateProvince.Abbreviation;
+            if (address.StateProvinceId != null)
+                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address).Abbreviation;
 
-            if (address.Country != null)
-                transactionRequestAddress.country = address.Country.TwoLetterIsoCode;
+            if (address.CountryId != null)
+                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value).TwoLetterIsoCode;
 
             return transactionRequestAddress;
         }
 
-        private static nameAndAddressType GetRecurringTransactionRequestAddress(Address address)
+        protected virtual nameAndAddressType GetRecurringTransactionRequestAddress(int addressId)
         {
+            var address = _addressService.GetAddressById(addressId);
+
             var transactionRequestAddress = new nameAndAddressType
             {
                 firstName = address.FirstName,
@@ -184,11 +197,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (!string.IsNullOrEmpty(address.Company))
                 transactionRequestAddress.company = address.Company;
 
-            if (address.StateProvince != null)
-                transactionRequestAddress.state = address.StateProvince.Abbreviation;
+            if (address.StateProvinceId != null)
+                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address).Abbreviation;
 
-            if (address.Country != null)
-                transactionRequestAddress.country = address.Country.TwoLetterIsoCode;
+            if (address.CountryId != null)
+                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value).TwoLetterIsoCode;
 
             return transactionRequestAddress;
         }
@@ -289,7 +302,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     throw new NopException("Not supported transaction mode");
             }
 
-            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddress != null ? GetTransactionRequestAddress(customer.ShippingAddress) : GetTransactionRequestAddress(customer.BillingAddress);
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddressId != null ? GetTransactionRequestAddress(customer.ShippingAddressId.Value) : GetTransactionRequestAddress(customer.BillingAddressId ?? 0);
 
             var transactionRequest = new transactionRequestType
             {
@@ -307,9 +320,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 }
             };
 
-            if (customer.ShippingAddress != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
+            if (customer.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
             {
-                var shipTo = GetTransactionRequestAddress(customer.ShippingAddress);
+                var shipTo = GetTransactionRequestAddress(customer.ShippingAddressId.Value);
                 transactionRequest.shipTo = shipTo;
             }
 
@@ -593,7 +606,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             //standard api call to retrieve response
             var paymentType = new paymentType { Item = creditCard };
 
-            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddress != null ? GetRecurringTransactionRequestAddress(customer.ShippingAddress) : GetRecurringTransactionRequestAddress(customer.BillingAddress);
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddressId != null ? GetRecurringTransactionRequestAddress(customer.ShippingAddressId ?? 0) : GetRecurringTransactionRequestAddress(customer.BillingAddressId ?? 0);
 
             var dtNow = DateTime.UtcNow;
 
@@ -637,7 +650,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 paymentSchedule = paymentSchedule,
                 customer = new customerType
                 {
-                    email = customer.BillingAddress.Email
+                    email = _addressService.GetAddressById(customer.BillingAddressId ?? 0)?.Email
                     //phone number should be in one of following formats: 111- 111-1111 or (111) 111-1111.
                     //phoneNumber = customer.BillingAddress.PhoneNumber
                 },
@@ -650,9 +663,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 }
             };
 
-            if (customer.ShippingAddress != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
+            if (customer.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
             {
-                var shipTo = GetRecurringTransactionRequestAddress(customer.ShippingAddress);
+                var shipTo = GetRecurringTransactionRequestAddress(customer.ShippingAddressId ?? 0);
                 subscriptionType.shipTo = shipTo;
             }
 
@@ -726,7 +739,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             {
                 if (transactionDetails.IsOk)
                 {
-                    var recurringPaymentHistory = rp.RecurringPaymentHistory;
+                    var recurringPaymentHistory = _orderService.GetRecurringPaymentHistory(rp);
                     var orders = _orderService.GetOrdersByIds(recurringPaymentHistory.Select(rph => rph.OrderId).ToArray()).ToList();
 
                     var transactionsIds = new List<string>();
@@ -748,12 +761,15 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                             OrderId = order.Id,
                             CreatedOnUtc = DateTime.UtcNow
                         };
-                        rp.RecurringPaymentHistory.Add(rph);
+
+                        _orderService.InsertRecurringPaymentHistory(rph);
+
+                        var initialOrder = _orderService.GetOrderById(rp.InitialOrderId);
 
                         if (newPaymentStatus == PaymentStatus.Authorized)
-                            rp.InitialOrder.AuthorizationTransactionId = transactionId;
+                            initialOrder.AuthorizationTransactionId = transactionId;
                         else
-                            rp.InitialOrder.CaptureTransactionId = transactionId;
+                            initialOrder.CaptureTransactionId = transactionId;
 
                         _orderService.UpdateRecurringPayment(rp);
                     }
@@ -912,22 +928,25 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             _settingService.SaveSetting(settings);
 
             //locales
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Notes", "If you're using this gateway, ensure that your primary store currency is supported by Authorize.NET.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox", "Use Sandbox");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox.Hint", "Check to enable Sandbox (testing environment).");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling", "Use shipping address.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling.Hint", "Check if you want to use the shipping address as a billing address.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues", "Transaction mode");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues.Hint", "Choose transaction mode.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactionKey", "Transaction key");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactionKey.Hint", "Specify transaction key.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.LoginId", "Login ID");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.LoginId.Hint", "Specify login identifier.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee", "Additional fee");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription", "Pay by credit / debit card");
+            _localizationService.AddPluginLocaleResource(new Dictionary<string, string>
+            {
+                ["Plugins.Payments.AuthorizeNet.Notes"] = "If you're using this gateway, ensure that your primary store currency is supported by Authorize.NET.",
+                ["Plugins.Payments.AuthorizeNet.Fields.UseSandbox"] = "Use Sandbox",
+                ["Plugins.Payments.AuthorizeNet.Fields.UseSandbox.Hint"] = "Check to enable Sandbox (testing environment).",
+                ["Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling"] = "Use shipping address.",
+                ["Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling.Hint"] = "Check if you want to use the shipping address as a billing address.",
+                ["Plugins.Payments.AuthorizeNet.Fields.TransactModeValues"] = "Transaction mode",
+                ["Plugins.Payments.AuthorizeNet.Fields.TransactModeValues.Hint"] = "Choose transaction mode.",
+                ["Plugins.Payments.AuthorizeNet.Fields.TransactionKey"] = "Transaction key",
+                ["Plugins.Payments.AuthorizeNet.Fields.TransactionKey.Hint"] = "Specify transaction key.",
+                ["Plugins.Payments.AuthorizeNet.Fields.LoginId"] = "Login ID",
+                ["Plugins.Payments.AuthorizeNet.Fields.LoginId.Hint"] = "Specify login identifier.",
+                ["Plugins.Payments.AuthorizeNet.Fields.AdditionalFee"] = "Additional fee",
+                ["Plugins.Payments.AuthorizeNet.Fields.AdditionalFee.Hint"] = "Enter additional fee to charge your customers.",
+                ["Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage"] = "Additional fee. Use percentage",
+                ["Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage.Hint"] = "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.",
+                ["Plugins.Payments.AuthorizeNet.PaymentMethodDescription"] = "Pay by credit / debit card"
+            });
 
             base.Install();
         }
@@ -941,23 +960,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             _settingService.DeleteSetting<AuthorizeNetPaymentSettings>();
 
             //locales
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Notes");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseSandbox.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.UseShippingAddressAsBilling.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactModeValues.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactionKey");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.TransactionKey.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.LoginId");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.LoginId.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFee.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.Fields.AdditionalFeePercentage.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription");
-            
+            _localizationService.DeletePluginLocaleResources("Plugins.Payments.AuthorizeNet");
+
             base.Uninstall();
         }
 

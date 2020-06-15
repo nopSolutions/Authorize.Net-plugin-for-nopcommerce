@@ -29,7 +29,6 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             ISettingService settingService,
             IStoreContext storeContext,
             IPaymentPluginManager paymentPluginManager,
-            IPaymentService paymentService,
             IPermissionService permissionService)
         {
             _localizationService = localizationService;
