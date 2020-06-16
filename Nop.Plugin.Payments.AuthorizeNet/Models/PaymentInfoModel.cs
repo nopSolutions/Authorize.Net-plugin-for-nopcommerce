@@ -7,11 +7,17 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Models
 {
     public class PaymentInfoModel : BaseNopModel
     {
+        #region Ctor
+
         public PaymentInfoModel()
         {
             ExpireMonths = new List<SelectListItem>();
             ExpireYears = new List<SelectListItem>();
         }
+
+        #endregion
+
+        #region Properties
 
         [NopResourceDisplayName("Payment.CardholderName")]
         public string CardholderName { get; set; }
@@ -31,5 +37,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Models
 
         [NopResourceDisplayName("Payment.CardCode")]
         public string CardCode { get; set; }
+
+        #endregion
     }
 }

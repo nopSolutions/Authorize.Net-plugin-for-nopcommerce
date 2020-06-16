@@ -8,9 +8,11 @@ using Nop.Web.Framework.Components;
 
 namespace Nop.Plugin.Payments.AuthorizeNet.Components
 {
-    [ViewComponent(Name = "AuthorizeNet")]
-    public class AuthorizeNetViewComponent : NopViewComponent
+    [ViewComponent(Name = Defaults.PAYMENT_INFO_VIEW_COMPONENT_NAME)]
+    public class PaymentInfoViewComponent : NopViewComponent
     {
+        #region Methods
+        
         public IViewComponentResult Invoke()
         {
             var model = new PaymentInfoModel();
@@ -59,5 +61,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Components
 
             return View("~/Plugins/Payments.AuthorizeNet/Views/PaymentInfo.cshtml", model);
         }
+
+        #endregion
     }
 }

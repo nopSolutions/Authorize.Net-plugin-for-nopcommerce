@@ -13,8 +13,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         public void RegisterRoutes(IEndpointRouteBuilder endpointRouteBuilder)
         {
             //IPN
-            endpointRouteBuilder.MapControllerRoute("Plugin.Payments.AuthorizeNet.IPNHandler", "Plugins/PaymentAuthorizeNet/IPNHandler",
-                new { controller = "PaymentAuthorizeNet", action = "IPNHandler" });
+            endpointRouteBuilder.MapControllerRoute("Plugin.Payments.AuthorizeNet.IPNHandler", "Plugins/AuthorizeNet/IPNHandler",
+                new { controller = "AuthorizeNet", action = "IPNHandler" });
         }
 
         public int Priority => 0;

@@ -15,32 +15,43 @@ using Nop.Web.Framework.Mvc.Filters;
 
 namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
 {
-    public class PaymentAuthorizeNetController : BasePaymentController
+    public class AuthorizeNetController : BasePaymentController
     {
+        #region Fields
+
         private readonly ILocalizationService _localizationService;
         private readonly INotificationService _notificationService;
-        private readonly ISettingService _settingService;
-        private readonly IStoreContext _storeContext;
         private readonly IPaymentPluginManager _paymentPluginManager;
         private readonly IPermissionService _permissionService;
+        private readonly ISettingService _settingService;
+        private readonly IStoreContext _storeContext;
 
-        public PaymentAuthorizeNetController(ILocalizationService localizationService,
+        #endregion
+
+        #region Ctor
+
+        public AuthorizeNetController(ILocalizationService localizationService,
             INotificationService notificationService,
-            ISettingService settingService,
-            IStoreContext storeContext,
             IPaymentPluginManager paymentPluginManager,
-            IPermissionService permissionService)
+            IPermissionService permissionService,
+            ISettingService settingService,
+            IStoreContext storeContext)
         {
             _localizationService = localizationService;
             _notificationService = notificationService;
-            _settingService = settingService;
-            _storeContext = storeContext;
             _paymentPluginManager = paymentPluginManager;
             _permissionService = permissionService;
+            _settingService = settingService;
+            _storeContext = storeContext;
         }
+
+        #endregion
+
+        #region Methods
 
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
+        [AutoValidateAntiforgeryToken]
         public IActionResult Configure()
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
@@ -80,6 +91,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
         [HttpPost]
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
+        [AutoValidateAntiforgeryToken]
         public IActionResult Configure(ConfigurationModel model)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
@@ -122,7 +134,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
 
         public IActionResult IPNHandler(IpnModel model, IFormCollection form)
         {
-            if (!(_paymentPluginManager.LoadPluginBySystemName("Payments.AuthorizeNet") is AuthorizeNetPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor) ||
+            if (!(_paymentPluginManager.LoadPluginBySystemName(Defaults.SYSTEM_NAME) is AuthorizeNetPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor) ||
                 !processor.PluginDescriptor.Installed)
                 throw new NopException("AuthorizeNet module cannot be loaded");
 
@@ -138,5 +150,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             //nothing should be rendered to visitor
             return Content(string.Empty);
         }
+
+        #endregion
     }
 }

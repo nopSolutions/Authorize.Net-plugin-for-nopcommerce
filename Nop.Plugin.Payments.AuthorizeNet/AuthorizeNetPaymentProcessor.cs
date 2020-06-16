@@ -46,8 +46,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IOrderService _orderService;
         private readonly IPaymentService _paymentService;
-        private readonly IStateProvinceService _stateProvinceService;
         private readonly ISettingService _settingService;
+        private readonly IStateProvinceService _stateProvinceService;
         private readonly IWebHelper _webHelper;
 
         #endregion
@@ -66,8 +66,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             IOrderProcessingService orderProcessingService,
             IOrderService orderService,
             IPaymentService paymentService,
-            IStateProvinceService stateProvinceService,
             ISettingService settingService,
+            IStateProvinceService stateProvinceService,
             IWebHelper webHelper)
         {
             _authorizeNetPaymentSettings = authorizeNetPaymentSettings;
@@ -82,8 +82,8 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             _orderProcessingService = orderProcessingService;
             _orderService = orderService;
             _paymentService = paymentService;
-            _stateProvinceService = stateProvinceService;
             _settingService = settingService;
+            _stateProvinceService = stateProvinceService;
             _webHelper = webHelper;
         }
 
@@ -91,7 +91,13 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
         #region Utilities
 
-        private static createTransactionResponse GetApiResponse(createTransactionController controller, IList<string> errors)
+        /// <summary>
+        /// Gets API response
+        /// </summary>
+        /// <param name="controller">Transaction controller</param>
+        /// <param name="errors">List of errors</param>
+        /// <returns>API response</returns>
+        protected static createTransactionResponse GetApiResponse(createTransactionController controller, IList<string> errors)
         {
             var response = controller.GetApiResponse();
             
@@ -155,9 +161,17 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             return null;
         }
 
+        /// <summary>
+        /// Gets address
+        /// </summary>
+        /// <param name="addressId">Address ID</param>
+        /// <returns>Address</returns>
         protected virtual customerAddressType GetTransactionRequestAddress(int addressId)
         {
             var address = _addressService.GetAddressById(addressId);
+
+            if (address == null)
+                return new customerAddressType();
 
             var transactionRequestAddress = new customerAddressType
             {
@@ -172,18 +186,26 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (!string.IsNullOrEmpty(address.Company))
                 transactionRequestAddress.company = address.Company;
 
-            if (address.StateProvinceId != null)
-                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address).Abbreviation;
+            if (address.StateProvinceId.HasValue)
+                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address)?.Abbreviation;
 
-            if (address.CountryId != null)
-                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value).TwoLetterIsoCode;
+            if (address.CountryId.HasValue)
+                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value)?.TwoLetterIsoCode;
 
             return transactionRequestAddress;
         }
 
+        /// <summary>
+        /// Gets an address to recurring transaction request
+        /// </summary>
+        /// <param name="addressId">Address ID</param>
+        /// <returns>Address</returns>
         protected virtual nameAndAddressType GetRecurringTransactionRequestAddress(int addressId)
         {
             var address = _addressService.GetAddressById(addressId);
+
+            if (address == null)
+                return new nameAndAddressType();
 
             var transactionRequestAddress = new nameAndAddressType
             {
@@ -197,16 +219,19 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (!string.IsNullOrEmpty(address.Company))
                 transactionRequestAddress.company = address.Company;
 
-            if (address.StateProvinceId != null)
-                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address).Abbreviation;
+            if (address.StateProvinceId.HasValue)
+                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address)?.Abbreviation;
 
-            if (address.CountryId != null)
-                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value).TwoLetterIsoCode;
+            if (address.CountryId.HasValue)
+                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value)?.TwoLetterIsoCode;
 
             return transactionRequestAddress;
         }
 
-        private void PrepareAuthorizeNet()
+        /// <summary>
+        /// Configure Authorize.Net API
+        /// </summary>
+        protected virtual void PrepareAuthorizeNet()
         {
             ApiOperationBase<ANetApiRequest, ANetApiResponse>.RunEnvironment = _authorizeNetPaymentSettings.UseSandbox
                 ? AuthorizeNetSDK.Environment.SANDBOX
@@ -221,11 +246,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             };
         }
 
+        /// <summary>
+        /// Gets transaction details
+        /// </summary>
+        /// <param name="transactionId">Transaction ID</param>
+        /// <returns>Transaction Details</returns>
         protected virtual TransactionDetails GetTransactionDetails(string transactionId)
         {
             PrepareAuthorizeNet();
 
-            var request = new getTransactionDetailsRequest {transId = transactionId};
+            var request = new getTransactionDetailsRequest { transId = transactionId };
 
             // instantiate the controller that will call the service
             var controller = new getTransactionDetailsController(request);
@@ -273,7 +303,6 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
-            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
 
             PrepareAuthorizeNet();
 
@@ -288,21 +317,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             //standard api call to retrieve response
             var paymentType = new paymentType { Item = creditCard };
 
-            transactionTypeEnum transactionType;
-
-            switch (_authorizeNetPaymentSettings.TransactMode)
+            var transactionType = _authorizeNetPaymentSettings.TransactMode switch
             {
-                case TransactMode.Authorize:
-                    transactionType = transactionTypeEnum.authOnlyTransaction;
-                    break;
-                case TransactMode.AuthorizeAndCapture:
-                    transactionType = transactionTypeEnum.authCaptureTransaction;
-                    break;
-                default:
-                    throw new NopException("Not supported transaction mode");
-            }
+                TransactMode.Authorize => transactionTypeEnum.authOnlyTransaction,
+                TransactMode.AuthorizeAndCapture => transactionTypeEnum.authCaptureTransaction,
+                _ => throw new NopException("Not supported transaction mode")
+            };
 
-            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddressId != null ? GetTransactionRequestAddress(customer.ShippingAddressId.Value) : GetTransactionRequestAddress(customer.BillingAddressId ?? 0);
+            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer?.ShippingAddressId != null ? GetTransactionRequestAddress(customer.ShippingAddressId.Value) : GetTransactionRequestAddress(customer?.BillingAddressId ?? 0);
 
             var transactionRequest = new transactionRequestType
             {
@@ -320,7 +344,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 }
             };
 
-            if (customer.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
+            if (customer?.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
             {
                 var shipTo = GetTransactionRequestAddress(customer.ShippingAddressId.Value);
                 transactionRequest.shipTo = shipTo;
@@ -339,16 +363,18 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (response == null)
                 return result;
 
-            if (_authorizeNetPaymentSettings.TransactMode == TransactMode.Authorize)
+            switch (_authorizeNetPaymentSettings.TransactMode)
             {
-                result.AuthorizationTransactionId = response.transactionResponse.transId;
-                result.AuthorizationTransactionCode =
-                    $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
+                case TransactMode.Authorize:
+                    result.AuthorizationTransactionId = response.transactionResponse.transId;
+                    result.AuthorizationTransactionCode =
+                        $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
+                    break;
+                case TransactMode.AuthorizeAndCapture:
+                    result.CaptureTransactionId =
+                        $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
+                    break;
             }
-
-            if (_authorizeNetPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture)
-                result.CaptureTransactionId =
-                    $"{response.transactionResponse.transId},{response.transactionResponse.authCode}";
 
             result.AuthorizationTransactionResult =
                 $"Approved ({response.transactionResponse.responseCode}: {response.transactionResponse.messages[0].description})";
@@ -376,6 +402,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         {
             var result = _paymentService.CalculateAdditionalFee(cart,
                 _authorizeNetPaymentSettings.AdditionalFee, _authorizeNetPaymentSettings.AdditionalFeePercentage);
+           
             return result;
         }
 
@@ -590,8 +617,6 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
-           
-            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
 
             PrepareAuthorizeNet();
             
@@ -606,7 +631,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             //standard api call to retrieve response
             var paymentType = new paymentType { Item = creditCard };
 
-            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer.ShippingAddressId != null ? GetRecurringTransactionRequestAddress(customer.ShippingAddressId ?? 0) : GetRecurringTransactionRequestAddress(customer.BillingAddressId ?? 0);
+            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer?.ShippingAddressId != null ? GetRecurringTransactionRequestAddress(customer.ShippingAddressId ?? 0) : GetRecurringTransactionRequestAddress(customer?.BillingAddressId ?? 0);
 
             var dtNow = DateTime.UtcNow;
 
@@ -650,9 +677,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 paymentSchedule = paymentSchedule,
                 customer = new customerType
                 {
-                    email = _addressService.GetAddressById(customer.BillingAddressId ?? 0)?.Email
-                    //phone number should be in one of following formats: 111- 111-1111 or (111) 111-1111.
-                    //phoneNumber = customer.BillingAddress.PhoneNumber
+                    email = _addressService.GetAddressById(customer?.BillingAddressId ?? 0)?.Email
                 },
                 
                 order = new orderType
@@ -663,7 +688,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 }
             };
 
-            if (customer.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
+            if (customer?.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
             {
                 var shipTo = GetRecurringTransactionRequestAddress(customer.ShippingAddressId ?? 0);
                 subscriptionType.shipTo = shipTo;
@@ -710,9 +735,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             var transactionDetails = GetTransactionDetails(transactionId);
 
             if (transactionDetails.TransactionStatus == "refundTransaction")
-            {
                 return;
-            }
 
             var orderDescriptions = transactionDetails.OrderDescriptions;
 
@@ -809,6 +832,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             var result = new CancelRecurringPaymentResult();
+
             PrepareAuthorizeNet();
 
             var request = new ARBCancelSubscriptionRequest { subscriptionId = cancelPaymentRequest.Order.SubscriptionTransactionId };
@@ -904,12 +928,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         public string GetPublicViewComponentName()
         {
-            return "AuthorizeNet";
+            return Defaults.PAYMENT_INFO_VIEW_COMPONENT_NAME;
         }
 
         public override string GetConfigurationPageUrl()
         {
-            return $"{_webHelper.GetStoreLocation()}Admin/PaymentAuthorizeNet/Configure";
+            return $"{_webHelper.GetStoreLocation()}Admin/AuthorizeNet/Configure";
         }
 
         /// <summary>
