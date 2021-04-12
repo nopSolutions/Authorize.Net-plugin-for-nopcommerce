@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AuthorizeNet.Api.Contracts.V1;
 using AuthorizeNet.Api.Controllers;
 using AuthorizeNet.Api.Controllers.Bases;
@@ -166,9 +167,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="addressId">Address ID</param>
         /// <returns>Address</returns>
-        protected virtual customerAddressType GetTransactionRequestAddress(int addressId)
+        protected virtual async Task<customerAddressType> GetTransactionRequestAddressAsync(int addressId)
         {
-            var address = _addressService.GetAddressById(addressId);
+            var address = await _addressService.GetAddressByIdAsync(addressId);
 
             if (address == null)
                 return new customerAddressType();
@@ -187,10 +188,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 transactionRequestAddress.company = address.Company;
 
             if (address.StateProvinceId.HasValue)
-                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address)?.Abbreviation;
+                transactionRequestAddress.state = (await _stateProvinceService.GetStateProvinceByAddressAsync(address))?.Abbreviation;
 
             if (address.CountryId.HasValue)
-                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value)?.TwoLetterIsoCode;
+                transactionRequestAddress.country = (await _countryService.GetCountryByIdAsync(address.CountryId.Value))?.TwoLetterIsoCode;
 
             return transactionRequestAddress;
         }
@@ -200,9 +201,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="addressId">Address ID</param>
         /// <returns>Address</returns>
-        protected virtual nameAndAddressType GetRecurringTransactionRequestAddress(int addressId)
+        protected virtual async Task<nameAndAddressType> GetRecurringTransactionRequestAddressAsync(int addressId)
         {
-            var address = _addressService.GetAddressById(addressId);
+            var address = await _addressService.GetAddressByIdAsync(addressId);
 
             if (address == null)
                 return new nameAndAddressType();
@@ -220,10 +221,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 transactionRequestAddress.company = address.Company;
 
             if (address.StateProvinceId.HasValue)
-                transactionRequestAddress.state = _stateProvinceService.GetStateProvinceByAddress(address)?.Abbreviation;
+                transactionRequestAddress.state = (await _stateProvinceService.GetStateProvinceByAddressAsync(address))?.Abbreviation;
 
             if (address.CountryId.HasValue)
-                transactionRequestAddress.country = _countryService.GetCountryById(address.CountryId.Value)?.TwoLetterIsoCode;
+                transactionRequestAddress.country = (await _countryService.GetCountryByIdAsync(address.CountryId.Value))?.TwoLetterIsoCode;
 
             return transactionRequestAddress;
         }
@@ -251,7 +252,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="transactionId">Transaction ID</param>
         /// <returns>Transaction Details</returns>
-        protected virtual TransactionDetails GetTransactionDetails(string transactionId)
+        protected virtual async Task<TransactionDetails> GetTransactionDetailsAsync(string transactionId)
         {
             PrepareAuthorizeNet();
 
@@ -266,7 +267,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (response?.messages == null)
             {
-                _logger.Error($"Authorize.NET unknown error (transactionId: {transactionId})");
+                await _logger.ErrorAsync($"Authorize.NET unknown error (transactionId: {transactionId})");
 
                 return new TransactionDetails { IsOk = false };
             }
@@ -279,7 +280,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (response.transaction == null)
             {
-                _logger.Error($"Authorize.NET: Transaction data is missing (transactionId: {transactionId})");
+                await _logger.ErrorAsync($"Authorize.NET: Transaction data is missing (transactionId: {transactionId})");
             }
             else
             {
@@ -300,7 +301,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
+        public async Task<ProcessPaymentResult> ProcessPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
 
@@ -324,16 +325,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 _ => throw new NopException("Not supported transaction mode")
             };
 
-            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+            var customer = await _customerService.GetCustomerByIdAsync(processPaymentRequest.CustomerId);
 
-            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer?.ShippingAddressId != null ? GetTransactionRequestAddress(customer.ShippingAddressId.Value) : GetTransactionRequestAddress(customer?.BillingAddressId ?? 0);
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer?.ShippingAddressId != null ? await GetTransactionRequestAddressAsync(customer.ShippingAddressId.Value) : await GetTransactionRequestAddressAsync(customer?.BillingAddressId ?? 0);
 
             var transactionRequest = new transactionRequestType
             {
                 transactionType = transactionType.ToString(),
                 amount = Math.Round(processPaymentRequest.OrderTotal, 2),
                 payment = paymentType,
-                currencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode,
+                currencyCode = await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId).ContinueWith(t => t.Result.CurrencyCode),
                 billTo = billTo,
                 customerIP = _webHelper.GetCurrentIpAddress(),
                 order = new orderType
@@ -346,7 +347,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (customer?.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
             {
-                var shipTo = GetTransactionRequestAddress(customer.ShippingAddressId.Value);
+                var shipTo = await GetTransactionRequestAddressAsync(customer.ShippingAddressId.Value);
                 transactionRequest.shipTo = shipTo;
             }
 
@@ -388,9 +389,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// Post process payment (used by payment gateways that require redirecting to a third-party URL)
         /// </summary>
         /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
+        public Task PostProcessPaymentAsync(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             //nothing
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -398,9 +400,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="cart">Shopping cart</param>
         /// <returns>Additional handling fee</returns>
-        public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
+        public async Task<decimal> GetAdditionalHandlingFeeAsync(IList<ShoppingCartItem> cart)
         {
-            var result = _paymentService.CalculateAdditionalFee(cart,
+            var result = await _paymentService.CalculateAdditionalFeeAsync(cart,
                 _authorizeNetPaymentSettings.AdditionalFee, _authorizeNetPaymentSettings.AdditionalFeePercentage);
            
             return result;
@@ -411,12 +413,12 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="cart">Shopping cart</param>
         /// <returns>true - hide; false - display.</returns>
-        public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
+        public Task<bool> HidePaymentMethodAsync(IList<ShoppingCartItem> cart)
         {
             //you can put any logic here
             //for example, hide this payment method if all products in the cart are downloadable
             //or hide this payment method if current customer is from certain country
-            return false;
+            return Task.FromResult(false);
         }
         
         /// <summary>
@@ -424,7 +426,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="capturePaymentRequest">Capture payment request</param>
         /// <returns>Capture payment result</returns>
-        public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
+        public async Task<CapturePaymentResult> CaptureAsync(CapturePaymentRequest capturePaymentRequest)
         {
             var result = new CapturePaymentResult();
 
@@ -436,7 +438,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 transactionType = transactionTypeEnum.priorAuthCaptureTransaction.ToString(),
                 amount = Math.Round(capturePaymentRequest.Order.OrderTotal, 2),
                 refTransId = codes[0],
-                currencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode
+                currencyCode = await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId).ContinueWith(t => t.Result.CurrencyCode)
             };
 
             var request = new createTransactionRequest { transactionRequest = transactionRequest };
@@ -466,7 +468,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="refundPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
+        public async Task<RefundPaymentResult> RefundAsync(RefundPaymentRequest refundPaymentRequest)
         {
             var result = new RefundPaymentResult();
 
@@ -476,7 +478,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var transactionId = codes[0];
 
-            var transactionDetails = GetTransactionDetails(transactionId);
+            var transactionDetails = await GetTransactionDetailsAsync(transactionId);
 
             if (transactionDetails.TransactionStatus == "capturedPendingSettlement")
             {
@@ -487,7 +489,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     return result;
                 }
 
-                var voidResult = Void(new VoidPaymentRequest
+                var voidResult = await VoidAsync(new VoidPaymentRequest
                 {
                     Order = refundPaymentRequest.Order
                 });
@@ -529,7 +531,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 transactionType = transactionTypeEnum.refundTransaction.ToString(),
                 amount = Math.Round(refundPaymentRequest.AmountToRefund, 2),
                 refTransId = transactionId,
-                currencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode,
+                currencyCode = await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId).ContinueWith(t => t.Result.CurrencyCode),
 
                 order = new orderType
                 {
@@ -558,7 +560,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="voidPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
+        public Task<VoidPaymentResult> VoidAsync(VoidPaymentRequest voidPaymentRequest)
         {
             var result = new VoidPaymentResult();
 
@@ -569,7 +571,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (string.IsNullOrEmpty(maskedCreditCardNumberDecrypted) || maskedCreditCardNumberDecrypted.Length < 4)
             {
                 result.AddError("Last four digits of Credit Card Not Available");
-                return result;
+                return Task.FromResult(result);
             }
 
             var lastFourDigitsCardNumber = maskedCreditCardNumberDecrypted.Substring(maskedCreditCardNumberDecrypted.Length - 4);
@@ -602,11 +604,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             //validate
             if (response == null)
-                return result;
+                return Task.FromResult(result);
 
             result.NewPaymentStatus = PaymentStatus.Voided;
 
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -614,7 +616,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
+        public async Task<ProcessPaymentResult> ProcessRecurringPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
 
@@ -631,9 +633,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             //standard api call to retrieve response
             var paymentType = new paymentType { Item = creditCard };
 
-            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+            var customer = await _customerService.GetCustomerByIdAsync(processPaymentRequest.CustomerId);
 
-            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer?.ShippingAddressId != null ? GetRecurringTransactionRequestAddress(customer.ShippingAddressId ?? 0) : GetRecurringTransactionRequestAddress(customer?.BillingAddressId ?? 0);
+            var billTo = _authorizeNetPaymentSettings.UseShippingAddressAsBilling && customer?.ShippingAddressId != null ? await GetRecurringTransactionRequestAddressAsync(customer.ShippingAddressId ?? 0) : await GetRecurringTransactionRequestAddressAsync(customer?.BillingAddressId ?? 0);
 
             var dtNow = DateTime.UtcNow;
 
@@ -677,7 +679,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 paymentSchedule = paymentSchedule,
                 customer = new customerType
                 {
-                    email = _addressService.GetAddressById(customer?.BillingAddressId ?? 0)?.Email
+                    email = await _addressService.GetAddressByIdAsync(customer?.BillingAddressId ?? 0).ContinueWith(t => t.Result?.Email)
                 },
                 
                 order = new orderType
@@ -690,7 +692,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (customer?.ShippingAddressId != null && !_authorizeNetPaymentSettings.UseShippingAddressAsBilling)
             {
-                var shipTo = GetRecurringTransactionRequestAddress(customer.ShippingAddressId ?? 0);
+                var shipTo = await GetRecurringTransactionRequestAddressAsync(customer.ShippingAddressId ?? 0);
                 subscriptionType.shipTo = shipTo;
             }
 
@@ -730,9 +732,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// Process recurring payment
         /// </summary>
         /// <param name="transactionId">AuthorizeNet transaction ID</param>
-        public void ProcessRecurringPayment(string transactionId)
+        public async Task ProcessRecurringPaymentAsync(string transactionId)
         {
-            var transactionDetails = GetTransactionDetails(transactionId);
+            var transactionDetails = await GetTransactionDetailsAsync(transactionId);
 
             if (transactionDetails.TransactionStatus == "refundTransaction")
                 return;
@@ -741,29 +743,29 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             if (orderDescriptions.Length < 2)
             {
-                _logger.Error($"Authorize.NET: Missing order GUID (transactionId: {transactionId})");
+                await _logger.ErrorAsync($"Authorize.NET: Missing order GUID (transactionId: {transactionId})");
                 return;
             }
 
             if (orderDescriptions[0].Contains("Full order"))
                 return;
 
-            var order = _orderService.GetOrderByGuid(new Guid(orderDescriptions[1]));
+            var order = await _orderService.GetOrderByGuidAsync(new Guid(orderDescriptions[1]));
 
             if (order == null)
             {
-                _logger.Error($"Authorize.NET: Order cannot be loaded (order GUID: {orderDescriptions[1]})");
+                await _logger.ErrorAsync($"Authorize.NET: Order cannot be loaded (order GUID: {orderDescriptions[1]})");
                 return;
             }
 
-            var recurringPayments = _orderService.SearchRecurringPayments(initialOrderId: order.Id);
+            var recurringPayments = await _orderService.SearchRecurringPaymentsAsync(initialOrderId: order.Id);
 
             foreach (var rp in recurringPayments)
             {
                 if (transactionDetails.IsOk)
                 {
-                    var recurringPaymentHistory = _orderService.GetRecurringPaymentHistory(rp);
-                    var orders = _orderService.GetOrdersByIds(recurringPaymentHistory.Select(rph => rph.OrderId).ToArray()).ToList();
+                    var recurringPaymentHistory = await _orderService.GetRecurringPaymentHistoryAsync(rp);
+                    var orders = (await _orderService.GetOrdersByIdsAsync(recurringPaymentHistory.Select(rph => rph.OrderId).ToArray())).ToList();
 
                     var transactionsIds = new List<string>();
                     transactionsIds.AddRange(orders.Select(o => o.AuthorizationTransactionId).Where(tId => !string.IsNullOrEmpty(tId)));
@@ -785,16 +787,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                             CreatedOnUtc = DateTime.UtcNow
                         };
 
-                        _orderService.InsertRecurringPaymentHistory(rph);
+                        await _orderService.InsertRecurringPaymentHistoryAsync(rph);
 
-                        var initialOrder = _orderService.GetOrderById(rp.InitialOrderId);
+                        var initialOrder = await _orderService.GetOrderByIdAsync(rp.InitialOrderId);
 
                         if (newPaymentStatus == PaymentStatus.Authorized)
                             initialOrder.AuthorizationTransactionId = transactionId;
                         else
                             initialOrder.CaptureTransactionId = transactionId;
 
-                        _orderService.UpdateRecurringPayment(rp);
+                        await _orderService.UpdateRecurringPaymentAsync(rp);
                     }
                     else
                     {
@@ -809,7 +811,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                         else
                             processPaymentResult.CaptureTransactionId = transactionId;
 
-                        _orderProcessingService.ProcessNextRecurringPayment(rp, processPaymentResult);
+                        await _orderProcessingService.ProcessNextRecurringPaymentAsync(rp, processPaymentResult);
                     }
                 }
                 else
@@ -819,7 +821,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                     processPaymentResult.RecurringPaymentFailed = true;
                     processPaymentResult.Errors.Add(
                         $"Authorize.Net Error: {transactionDetails.Message?.code} - {transactionDetails.Message?.text} (transactionId: {transactionId})");
-                    _orderProcessingService.ProcessNextRecurringPayment(rp, processPaymentResult);
+                    await _orderProcessingService.ProcessNextRecurringPaymentAsync(rp, processPaymentResult);
                 }
             }
         }
@@ -829,7 +831,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="cancelPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
+        public Task<CancelRecurringPaymentResult> CancelRecurringPaymentAsync(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             var result = new CancelRecurringPaymentResult();
 
@@ -843,7 +845,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             //validate
             if (response != null && response.messages.resultCode == messageTypeEnum.Ok)
-                return result;
+                return Task.FromResult(result);
 
             if (response != null)
             {
@@ -858,7 +860,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 result.AddError("Authorize.NET unknown error");
             }
            
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -866,13 +868,13 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>Result</returns>
-        public bool CanRePostProcessPayment(Order order)
+        public Task<bool> CanRePostProcessPaymentAsync(Order order)
         {
             if (order == null)
                 throw new ArgumentNullException(nameof(order));
             
             //it's not a redirection payment method. So we always return false
-            return false;
+            return Task.FromResult(false);
         }
 
         /// <summary>
@@ -880,7 +882,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="form">The parsed form values</param>
         /// <returns>List of validating errors</returns>
-        public IList<string> ValidatePaymentForm(IFormCollection form)
+        public Task<IList<string>> ValidatePaymentFormAsync(IFormCollection form)
         {
             var warnings = new List<string>();
 
@@ -900,7 +902,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             if (!validationResult.IsValid)
                 warnings.AddRange(validationResult.Errors.Select(error => error.ErrorMessage));
 
-            return warnings;
+            return Task.FromResult<IList<string>>(warnings);
         }
 
         /// <summary>
@@ -908,7 +910,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </summary>
         /// <param name="form">The parsed form values</param>
         /// <returns>Payment info holder</returns>
-        public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
+        public Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
         {
             var paymentInfo = new ProcessPaymentRequest
             {
@@ -920,7 +922,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 CreditCardCvv2 = form["CardCode"]
             };
 
-            return paymentInfo;
+            return Task.FromResult(paymentInfo);
         }
 
         /// <summary>
@@ -939,7 +941,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <summary>
         /// Install plugin
         /// </summary>
-        public override void Install()
+        public override async Task InstallAsync()
         {
             //settings
             var settings = new AuthorizeNetPaymentSettings
@@ -949,10 +951,10 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 TransactionKey = "123",
                 LoginId = "456"
             };
-            _settingService.SaveSetting(settings);
+            await _settingService.SaveSettingAsync(settings);
 
             //locales
-            _localizationService.AddPluginLocaleResource(new Dictionary<string, string>
+            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
             {
                 ["Plugins.Payments.AuthorizeNet.Notes"] = "If you're using this gateway, ensure that your primary store currency is supported by Authorize.NET.",
                 ["Plugins.Payments.AuthorizeNet.Fields.UseSandbox"] = "Use Sandbox",
@@ -972,21 +974,21 @@ namespace Nop.Plugin.Payments.AuthorizeNet
                 ["Plugins.Payments.AuthorizeNet.PaymentMethodDescription"] = "Pay by credit / debit card"
             });
 
-            base.Install();
+            await base.InstallAsync();
         }
 
         /// <summary>
         /// Uninstall plugin
         /// </summary>
-        public override void Uninstall()
+        public override async Task UninstallAsync()
         {
             //settings
-            _settingService.DeleteSetting<AuthorizeNetPaymentSettings>();
+            await _settingService.DeleteSettingAsync<AuthorizeNetPaymentSettings>();
 
             //locales
-            _localizationService.DeletePluginLocaleResources("Plugins.Payments.AuthorizeNet");
+            await _localizationService.DeleteLocaleResourcesAsync("Plugins.Payments.AuthorizeNet");
 
-            base.Uninstall();
+            await base.UninstallAsync();
         }
 
         #endregion
@@ -1031,7 +1033,11 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <summary>
         /// Gets a payment method description that will be displayed on checkout pages in the public store
         /// </summary>
-        public string PaymentMethodDescription => _localizationService.GetResource("Plugins.Payments.AuthorizeNet.PaymentMethodDescription");
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public async Task<string> GetPaymentMethodDescriptionAsync()
+        {
+            return await _localizationService.GetResourceAsync("Plugins.Payments.AuthorizeNet.PaymentMethodDescription");
+        }
 
         #endregion
 

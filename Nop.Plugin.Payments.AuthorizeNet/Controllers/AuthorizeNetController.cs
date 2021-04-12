@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
@@ -52,14 +53,14 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
         [AutoValidateAntiforgeryToken]
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var authorizeNetPaymentSettings = _settingService.LoadSetting<AuthorizeNetPaymentSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var authorizeNetPaymentSettings = await _settingService.LoadSettingAsync<AuthorizeNetPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
             {
@@ -70,19 +71,19 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
                 LoginId = authorizeNetPaymentSettings.LoginId,
                 AdditionalFee = authorizeNetPaymentSettings.AdditionalFee,
                 AdditionalFeePercentage = authorizeNetPaymentSettings.AdditionalFeePercentage,
-                TransactModeValues = authorizeNetPaymentSettings.TransactMode.ToSelectList(),
+                TransactModeValues = await authorizeNetPaymentSettings.TransactMode.ToSelectListAsync(),
                 ActiveStoreScopeConfiguration = storeScope
             };
 
             if (storeScope > 0)
             {
-                model.UseSandbox_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.UseSandbox, storeScope);
-                model.UseShippingAddressAsBilling_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.UseShippingAddressAsBilling, storeScope);
-                model.TransactModeId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.TransactMode, storeScope);
-                model.TransactionKey_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.TransactionKey, storeScope);
-                model.LoginId_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.LoginId, storeScope);
-                model.AdditionalFee_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFee, storeScope);
-                model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+                model.UseSandbox_OverrideForStore = await _settingService.SettingExistsAsync(authorizeNetPaymentSettings, x => x.UseSandbox, storeScope);
+                model.UseShippingAddressAsBilling_OverrideForStore = await _settingService.SettingExistsAsync(authorizeNetPaymentSettings, x => x.UseShippingAddressAsBilling, storeScope);
+                model.TransactModeId_OverrideForStore = await _settingService.SettingExistsAsync(authorizeNetPaymentSettings, x => x.TransactMode, storeScope);
+                model.TransactionKey_OverrideForStore = await _settingService.SettingExistsAsync(authorizeNetPaymentSettings, x => x.TransactionKey, storeScope);
+                model.LoginId_OverrideForStore = await _settingService.SettingExistsAsync(authorizeNetPaymentSettings, x => x.LoginId, storeScope);
+                model.AdditionalFee_OverrideForStore = await _settingService.SettingExistsAsync(authorizeNetPaymentSettings, x => x.AdditionalFee, storeScope);
+                model.AdditionalFeePercentage_OverrideForStore = await _settingService.SettingExistsAsync(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
             }
 
             return View("~/Plugins/Payments.AuthorizeNet/Views/Configure.cshtml", model);
@@ -92,17 +93,17 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
         [AutoValidateAntiforgeryToken]
-        public IActionResult Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
             //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var authorizeNetPaymentSettings = _settingService.LoadSetting<AuthorizeNetPaymentSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var authorizeNetPaymentSettings = await _settingService.LoadSettingAsync<AuthorizeNetPaymentSettings>(storeScope);
 
             //save settings
             authorizeNetPaymentSettings.UseSandbox = model.UseSandbox;
@@ -116,25 +117,25 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
-            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.UseSandbox, model.UseSandbox_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.UseShippingAddressAsBilling, model.UseShippingAddressAsBilling_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.TransactionKey, model.TransactionKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.LoginId, model.LoginId_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(authorizeNetPaymentSettings, x => x.UseSandbox, model.UseSandbox_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(authorizeNetPaymentSettings, x => x.UseShippingAddressAsBilling, model.UseShippingAddressAsBilling_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(authorizeNetPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(authorizeNetPaymentSettings, x => x.TransactionKey, model.TransactionKey_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(authorizeNetPaymentSettings, x => x.LoginId, model.LoginId_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(authorizeNetPaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(authorizeNetPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
 
             //now clear settings cache
-            _settingService.ClearCache();
+            await _settingService.ClearCacheAsync();
 
-            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
 
-        public IActionResult IPNHandler(IpnModel model, IFormCollection form)
+        public async Task<IActionResult> IPNHandler(IpnModel model, IFormCollection form)
         {
-            if (!(_paymentPluginManager.LoadPluginBySystemName(Defaults.SYSTEM_NAME) is AuthorizeNetPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor) ||
+            if ((await _paymentPluginManager.LoadPluginBySystemNameAsync(Defaults.SYSTEM_NAME)) is not AuthorizeNetPaymentProcessor processor || !_paymentPluginManager.IsPluginActive(processor) ||
                 !processor.PluginDescriptor.Installed)
                 throw new NopException("AuthorizeNet module cannot be loaded");
 
@@ -144,7 +145,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Controllers
             {
                 var transactionId = form.Keys.Contains("x_trans_id") ? form["x_trans_id"].ToString() : string.Empty;
 
-                processor.ProcessRecurringPayment(transactionId);
+                await processor.ProcessRecurringPaymentAsync(transactionId);
             }
 
             //nothing should be rendered to visitor
