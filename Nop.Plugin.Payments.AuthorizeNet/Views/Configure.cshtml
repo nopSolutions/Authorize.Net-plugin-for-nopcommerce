@@ -8,9 +8,9 @@
 @await Component.InvokeAsync("StoreScopeConfiguration")
 
 <form asp-controller="AuthorizeNet" asp-action="Configure" method="post">
-    <div class="panel-group">
-        <div class="panel panel-default">
-            <div class="panel-body">
+    <div class="cards-group">
+        <div class="card card-default">
+            <div class="card-body">
                 <p>
                     <b>@T("Plugins.Payments.AuthorizeNet.Notes")</b>
                 </p>
@@ -20,7 +20,7 @@
                     2. In your account settings specify the Silent Post URL (http://www.yourStore.com/Plugins/AuthorizeNet/IPNHandler)<br />
                     3. In your account settings activate the "Transaction Details API"
                 </p>
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="UseSandbox_OverrideForStore" asp-input="UseSandbox" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="UseSandbox" />
@@ -31,7 +31,7 @@
                     </div>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="UseShippingAddressAsBilling_OverrideForStore" asp-input="UseShippingAddressAsBilling" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="UseShippingAddressAsBilling" />
@@ -42,7 +42,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="TransactModeId_OverrideForStore" asp-input="TransactModeId" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="TransactModeId" />
@@ -52,7 +52,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="TransactionKey_OverrideForStore" asp-input="TransactionKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="TransactionKey" />
@@ -63,7 +63,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="LoginId_OverrideForStore" asp-input="LoginId" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="LoginId" />
@@ -74,7 +74,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="AdditionalFee_OverrideForStore" asp-input="AdditionalFee" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="AdditionalFee" />
@@ -85,7 +85,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore" asp-input="AdditionalFeePercentage" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="AdditionalFeePercentage" />
@@ -96,7 +96,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group row">
                     <div class="col-md-3">
                         &nbsp;
                     </div>

@@ -13,23 +13,23 @@ namespace Nop.Plugin.Payments.AuthorizeNet.Validators
         {
             RuleFor(x => x.CardholderName)
                 .NotEmpty()
-                .WithMessage(localizationService.GetResource("Payment.CardholderName.Required"));
+                .WithMessageAwait(localizationService.GetResourceAsync("Payment.CardholderName.Required"));
 
             RuleFor(x => x.CardNumber)
                 .IsCreditCard()
-                .WithMessage(localizationService.GetResource("Payment.CardNumber.Wrong"));
+                .WithMessageAwait(localizationService.GetResourceAsync("Payment.CardNumber.Wrong"));
 
             RuleFor(x => x.CardCode)
                 .Matches(@"^[0-9]{3,4}$")
-                .WithMessage(localizationService.GetResource("Payment.CardCode.Wrong"));
+                .WithMessageAwait(localizationService.GetResourceAsync("Payment.CardCode.Wrong"));
 
             RuleFor(x => x.ExpireMonth)
                 .NotEmpty()
-                .WithMessage(localizationService.GetResource("Payment.ExpireMonth.Required"));
+                .WithMessageAwait(localizationService.GetResourceAsync("Payment.ExpireMonth.Required"));
 
             RuleFor(x => x.ExpireYear)
                 .NotEmpty()
-                .WithMessage(localizationService.GetResource("Payment.ExpireYear.Required"));
+                .WithMessageAwait(localizationService.GetResourceAsync("Payment.ExpireYear.Required"));
         }
 
         #endregion
