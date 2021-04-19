@@ -173,16 +173,16 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var transactionRequestAddress = new customerAddressType
             {
-                firstName = address.FirstName,
-                lastName = address.LastName,
-                email = address.Email,
-                address = address.Address1,
-                city = address.City,
-                zip = address.ZipPostalCode
+                firstName = CommonHelper.EnsureMaximumLength(address.FirstName, 50),
+                lastName = CommonHelper.EnsureMaximumLength(address.LastName, 50),
+                email = CommonHelper.EnsureMaximumLength(address.Email, 50),
+                address = CommonHelper.EnsureMaximumLength(address.Address1, 60),
+                city = CommonHelper.EnsureMaximumLength(address.City, 40),
+                zip = CommonHelper.EnsureMaximumLength(address.ZipPostalCode, 20)
             };
 
             if (!string.IsNullOrEmpty(address.Company))
-                transactionRequestAddress.company = address.Company;
+                transactionRequestAddress.company = CommonHelper.EnsureMaximumLength(address.Company, 50);
 
             if (address.StateProvinceId.HasValue)
                 transactionRequestAddress.state = (await _stateProvinceService.GetStateProvinceByAddressAsync(address))?.Abbreviation;
@@ -210,15 +210,15 @@ namespace Nop.Plugin.Payments.AuthorizeNet
 
             var transactionRequestAddress = new nameAndAddressType
             {
-                firstName = address.FirstName,
-                lastName = address.LastName,
-                address = address.Address1,
-                city = address.City,
-                zip = address.ZipPostalCode
+                firstName = CommonHelper.EnsureMaximumLength(address.FirstName, 50),
+                lastName = CommonHelper.EnsureMaximumLength(address.LastName, 50),
+                address = CommonHelper.EnsureMaximumLength(address.Address1, 60),
+                city = CommonHelper.EnsureMaximumLength(address.City, 40),
+                zip = CommonHelper.EnsureMaximumLength(address.ZipPostalCode, 20)
             };
 
             if (!string.IsNullOrEmpty(address.Company))
-                transactionRequestAddress.company = address.Company;
+                transactionRequestAddress.company = CommonHelper.EnsureMaximumLength(address.Company, 50);
 
             if (address.StateProvinceId.HasValue)
                 transactionRequestAddress.state = (await _stateProvinceService.GetStateProvinceByAddressAsync(address))?.Abbreviation;
