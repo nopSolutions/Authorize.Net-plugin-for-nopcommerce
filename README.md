@@ -23,7 +23,6 @@ The Authorize.Net Payment Gateway module allows you to accept credit cards and e
 ## Features:
 * All major credit cards: Visa®, MasterCard®, American Express®, Discover®, Diner's Club, JCB
 * Signature Debit Cards
-* Digital payment solutions: Apple Pay, PayPal, Visa Checkout
 * Accept international transactions from customers worldwide. However, your business must be based in the United States, Canada, United Kingdom, Europe or Australia. For additional international locations, please see CyberSource Advanced
 
 ## Installation instructions:
