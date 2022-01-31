@@ -46,7 +46,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         private readonly ILogger _logger;
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IOrderService _orderService;
-        private readonly IPaymentService _paymentService;
+        private readonly IOrderTotalCalculationService _orderTotalCalculationService;
         private readonly ISettingService _settingService;
         private readonly IStateProvinceService _stateProvinceService;
         private readonly IWebHelper _webHelper;
@@ -66,7 +66,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             ILogger logger,
             IOrderProcessingService orderProcessingService,
             IOrderService orderService,
-            IPaymentService paymentService,
+            IOrderTotalCalculationService orderTotalCalculationService,
             ISettingService settingService,
             IStateProvinceService stateProvinceService,
             IWebHelper webHelper)
@@ -82,7 +82,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             _logger = logger;
             _orderProcessingService = orderProcessingService;
             _orderService = orderService;
-            _paymentService = paymentService;
+            _orderTotalCalculationService = orderTotalCalculationService;
             _settingService = settingService;
             _stateProvinceService = stateProvinceService;
             _webHelper = webHelper;
@@ -410,7 +410,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// </returns>
         public async Task<decimal> GetAdditionalHandlingFeeAsync(IList<ShoppingCartItem> cart)
         {
-            var result = await _paymentService.CalculateAdditionalFeeAsync(cart,
+            var result = await _orderTotalCalculationService.CalculatePaymentAdditionalFeeAsync(cart,
                 _authorizeNetPaymentSettings.AdditionalFee, _authorizeNetPaymentSettings.AdditionalFeePercentage);
            
             return result;
@@ -973,7 +973,7 @@ namespace Nop.Plugin.Payments.AuthorizeNet
             await _settingService.SaveSettingAsync(settings);
 
             //locales
-            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
+            await _localizationService.AddOrUpdateLocaleResourceAsync(new Dictionary<string, string>
             {
                 ["Plugins.Payments.AuthorizeNet.Notes"] = "If you're using this gateway, ensure that your primary store currency is supported by Authorize.NET.",
                 ["Plugins.Payments.AuthorizeNet.Fields.UseSandbox"] = "Use Sandbox",
