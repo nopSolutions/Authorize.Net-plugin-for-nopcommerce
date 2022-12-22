@@ -11,6 +11,7 @@ using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
+using Nop.Plugin.Payments.AuthorizeNet.Components;
 using Nop.Plugin.Payments.AuthorizeNet.Models;
 using Nop.Plugin.Payments.AuthorizeNet.Validators;
 using Nop.Services.Common;
@@ -946,9 +947,9 @@ namespace Nop.Plugin.Payments.AuthorizeNet
         /// <summary>
         /// Gets a view component for displaying plugin in public store ("payment info" checkout step)
         /// </summary>
-        public string GetPublicViewComponentName()
+        public Type GetPublicViewComponent()
         {
-            return Defaults.PAYMENT_INFO_VIEW_COMPONENT_NAME;
+            return typeof(PaymentInfoViewComponent);
         }
 
         public override string GetConfigurationPageUrl()
