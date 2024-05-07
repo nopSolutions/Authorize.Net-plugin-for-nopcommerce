@@ -1,18 +1,17 @@
-namespace Nop.Plugin.Payments.AuthorizeNet
+namespace Nop.Plugin.Payments.AuthorizeNet;
+
+/// <summary>
+/// Represents Authorize.Net payment processor transaction mode
+/// </summary>
+public enum TransactMode
 {
     /// <summary>
-    /// Represents Authorize.Net payment processor transaction mode
+    /// Authorize
     /// </summary>
-    public enum TransactMode
-    {
-        /// <summary>
-        /// Authorize
-        /// </summary>
-        Authorize = 1,
+    Authorize = 1,
 
-        /// <summary>
-        /// Authorize and capture
-        /// </summary>
-        AuthorizeAndCapture = 2
-    }
+    /// <summary>
+    /// Authorize and capture
+    /// </summary>
+    AuthorizeAndCapture = 2
 }
