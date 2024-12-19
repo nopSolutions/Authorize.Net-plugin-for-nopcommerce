@@ -21,7 +21,6 @@ public class AuthorizeNetController : BasePaymentController
     private readonly ILocalizationService _localizationService;
     private readonly INotificationService _notificationService;
     private readonly IPaymentPluginManager _paymentPluginManager;
-    private readonly IPermissionService _permissionService;
     private readonly ISettingService _settingService;
     private readonly IStoreContext _storeContext;
 
@@ -32,14 +31,12 @@ public class AuthorizeNetController : BasePaymentController
     public AuthorizeNetController(ILocalizationService localizationService,
         INotificationService notificationService,
         IPaymentPluginManager paymentPluginManager,
-        IPermissionService permissionService,
         ISettingService settingService,
         IStoreContext storeContext)
     {
         _localizationService = localizationService;
         _notificationService = notificationService;
         _paymentPluginManager = paymentPluginManager;
-        _permissionService = permissionService;
         _settingService = settingService;
         _storeContext = storeContext;
     }
@@ -51,11 +48,9 @@ public class AuthorizeNetController : BasePaymentController
     [AuthorizeAdmin]
     [Area(AreaNames.ADMIN)]
     [AutoValidateAntiforgeryToken]
+    [CheckPermission(StandardPermission.Configuration.MANAGE_PAYMENT_METHODS)]
     public async Task<IActionResult> Configure()
     {
-        if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
-            return AccessDeniedView();
-
         //load settings for a chosen store scope
         var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
         var authorizeNetPaymentSettings = await _settingService.LoadSettingAsync<AuthorizeNetPaymentSettings>(storeScope);
@@ -91,11 +86,9 @@ public class AuthorizeNetController : BasePaymentController
     [AuthorizeAdmin]
     [Area(AreaNames.ADMIN)]
     [AutoValidateAntiforgeryToken]
+    [CheckPermission(StandardPermission.Configuration.MANAGE_PAYMENT_METHODS)]
     public async Task<IActionResult> Configure(ConfigurationModel model)
     {
-        if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
-            return AccessDeniedView();
-
         if (!ModelState.IsValid)
             return await Configure();
 
